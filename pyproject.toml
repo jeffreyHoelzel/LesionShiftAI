@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lesionshiftai"
+version = "0.1.0"
+description = "Cross-dataset skin lesion classification benchmark for CNNs, ensembles, and Vision Transformers."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [
+    { name = "Jeffrey Hoelzel Jr." }
+]
+license = "LICENSE"
+dependencies = [
+    "torch>=2.2",
+    "torchvision>=0.17",
+    "timm>=1.0",
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "scikit-learn>=1.4",
+    "matplotlib>=3.8",
+    "seaborn>=0.13",
+    "opencv-python>=4.9",
+    "pillow>=10.2",
+    "albumentations>=1.4",
+    "pyyaml>=6.0",
+    "tqdm>=4.66",
+    "jupyter>=1.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "black>=24.0",
+    "ruff>=0.3",
+    "mypy>=1.8"
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 88
+target-version = ["py310"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
