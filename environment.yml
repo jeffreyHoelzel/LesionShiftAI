@@ -1,0 +1,28 @@
+name: lesionshiftai
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pytorch
+  - torchvision
+  - pytorch-cuda=12.1
+  - numpy
+  - pandas
+  - scikit-learn
+  - matplotlib
+  - seaborn
+  - pillow
+  - pyyaml
+  - tqdm
+  - jupyter
+  - pip
+  - pip:
+      - timm
+      - albumentations
+      - opencv-python
+      - black
+      - ruff
+      - pytest
+      - mypy
