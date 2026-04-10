@@ -5,24 +5,24 @@ channels:
   - conda-forge
 dependencies:
   - python=3.12
-  - pytorch
-  - torchvision
+  - pytorch=2.2.*
+  - torchvision=0.17.*
   - pytorch-cuda=12.1
-  - numpy
+  - numpy=1.26.*
   - pandas
   - scikit-learn
   - matplotlib
   - seaborn
+  - opencv
+  - albumentations
   - pillow
   - pyyaml
   - tqdm
   - jupyter
+  - black
+  - ruff
+  - pytest
+  - mypy
   - pip
   - pip:
       - timm
-      - albumentations
-      - opencv-python
-      - black
-      - ruff
-      - pytest
-      - mypy
