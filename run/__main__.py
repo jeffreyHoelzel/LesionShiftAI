@@ -5,7 +5,7 @@ from train_baseline_cnn import main as train_baseline_main
 
 COMMANDS = {
     "train-baseline": train_baseline_main,
-    "smoke-data": smoke_data_main,
+    "smoke-data": smoke_data_main
 }
 
 
