@@ -1,8 +1,9 @@
-from typing import Tuple, Dict, Any
+from typing import Any, Dict, Optional, Tuple
 import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader
+from lesionshiftai.core.distributed import DistState, all_gather_object
 from lesionshiftai.eval.metrics import compute_binary_metrics
 
 
@@ -12,14 +13,16 @@ def evaluate_loader(
     loader: DataLoader,
     criterion: torch.nn.Module,
     device: torch.device,
+    dist_state: Optional[DistState] = None,
     threshold: float = 0.5
 ) -> Tuple[Dict[str, Any], pd.DataFrame]:
     """Run model evaluation on a dataloader and return metrics + predictions."""
     model.eval()
 
-    losses = []
     y_true = []
     y_prob = []
+    loss_sum = 0.0
+    n = 0
     sample_ids = []
     datasets = []
 
@@ -32,25 +35,64 @@ def evaluate_loader(
         loss = criterion(logits, labels)
         probs = torch.sigmoid(logits)
 
-        losses.append(float(loss.item()))
         y_true.extend(labels.detach().cpu().numpy().astype(int).tolist())
         y_prob.extend(probs.detach().cpu().numpy().tolist())
         sample_ids.extend(batch["sample_id"])
         datasets.extend(batch["dataset"])
 
-    y_true_np = np.asarray(y_true, dtype=int)
-    y_prob_np = np.asarray(y_prob, dtype=float)
+        batch_n = int(labels.numel())
+        loss_sum += float(loss.item()) * batch_n
+        n += batch_n
 
-    metrics = compute_binary_metrics(y_true_np, y_prob_np, threshold=threshold)
-    metrics["loss"] = float(np.mean(losses)) if losses else float("nan")
-
-    preds = pd.DataFrame({
+    # aggregate evaluation metrics across ranks
+    payload = {
+        "y_true": y_true,
+        "y_prob": y_prob,
+        "loss_sum": loss_sum,
+        "n": n,
         "sample_id": sample_ids,
-        "dataset": datasets,
-        "label": y_true_np,
-        "prob_malignant": y_prob_np,
-        "pred_label": (y_prob_np >= threshold).astype(int)
-    })
+        "dataset": datasets
+    }
+    gathered = all_gather_object(payload) if (
+        dist_state and dist_state.enabled) else [payload]
+
+    y_true_all = []
+    y_prob_all = []
+    sample_id_all = []
+    dataset_all = []
+    loss_sum_all = 0.0
+    n_all = 0
+    for part in gathered:
+        y_true_all.extend(part["y_true"])
+        y_prob_all.extend(part["y_prob"])
+        sample_id_all.extend(part["sample_id"])
+        dataset_all.extend(part["dataset"])
+        loss_sum_all += float(part["loss_sum"])
+        n_all += int(part["n"])
+
+    y_true_np = np.asarray(y_true_all, dtype=int)
+    y_prob_np = np.asarray(y_prob_all, dtype=float)
+
+    preds = pd.DataFrame(
+        {
+            "sample_id": sample_id_all,
+            "dataset": dataset_all,
+            "label": y_true_np,
+            "prob_malignant": y_prob_np,
+            "pred_label": (y_prob_np >= threshold).astype(int),
+        }
+    )
+
+    # DistributedSampler can pad partitions; dedupe for final prediction/metric rows.
+    preds = preds.drop_duplicates(
+        subset=["dataset", "sample_id"], keep="first"
+    ).reset_index(drop=True)
+
+    y_true_final = preds["label"].to_numpy(dtype=int)
+    y_prob_final = preds["prob_malignant"].to_numpy(dtype=float)
+
+    metrics = compute_binary_metrics(y_true_final, y_prob_final, threshold=threshold)
+    metrics["loss"] = loss_sum_all / max(n_all, 1)
 
     return metrics, preds
 
