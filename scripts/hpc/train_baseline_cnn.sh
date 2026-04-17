@@ -11,10 +11,10 @@
 #SBATCH --error=/scratch/%u/train_baseline_cnn/error/%x_%j.err
 
 module purge
-module load anaconda3
-module load cuda
-source $(conda info --base)/etc/profile.d/conda.sh
-conda activate lesionshiftai
+module load mamba
+source "$(conda info --base)/etc/profile.d/conda.sh"
+ENV_PREFIX=${ENV_PREFIX:-/scratch/$USER/conda/envs/lesionshiftai}
+mamba activate "$ENV_PREFIX"
 
 # get number of GPUs being used on node
 GPUS=${SLURM_GPUS_ON_NODE##*:}
@@ -23,4 +23,4 @@ srun torchrun \
     --standalone \
     --nproc_per_node="$GPUS" \
     lesionshiftai.pyz train-baseline \
-    --config baseline_cnn.yml \
+    --config baseline_cnn.yml

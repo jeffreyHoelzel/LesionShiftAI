@@ -13,13 +13,14 @@ authors = [
 ]
 license = { file = "LICENSE" }
 dependencies = [
-    "torch>=2.2",
-    "torchvision>=0.17",
+    "torch>=2.4,<2.5",
+    "torchvision>=0.19,<0.20",
+    "torchaudio>=2.4,<2.5",
     "timm>=1.0",
-    "albumentations>=1.4",
+    "albumentations>=2",
     "opencv-python-headless>=4.9",
-    "numpy>=1.26,<2.0",
-    "pandas>=2.2",
+    "numpy>=2,<3",
+    "pandas>=2.3",
     "scikit-learn>=1.4",
     "matplotlib>=3.8",
     "seaborn>=0.13",
@@ -45,11 +46,11 @@ where = ["src"]
 
 [tool.black]
 line-length = 88
-target-version = ["py310"]
+target-version = ["py312"]
 
 [tool.ruff]
 line-length = 88
-target-version = "py310"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B"]

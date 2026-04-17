@@ -3,24 +3,28 @@ channels:
   - pytorch
   - nvidia
   - conda-forge
-  - defaults
+  - nodefaults
 dependencies:
   - python=3.12.*
   - pytorch=2.4.*
+  - torchvision=0.19.*
+  - torchaudio=2.4.*
   - pytorch-cuda=12.1
-  - torchvision
-  - torchaudio
-  - numpy=2.3.4
-  - pandas=2.3.3
+  - numpy>=2,<3
+  - pandas
   - scikit-learn
   - matplotlib
   - seaborn
   - opencv
-  - albumentations
   - timm
   - pillow
   - pyyaml
   - tqdm
+  - jupyter
+  - black
+  - ruff
+  - pytest
+  - mypy
   - setuptools
   - wheel
   - pip
