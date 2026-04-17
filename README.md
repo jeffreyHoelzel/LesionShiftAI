@@ -108,6 +108,10 @@ Important concerns include:
 
 Early repository setup and infrastructure development.
 
+Implementation docs for recently added pipeline code:
+
+- `docs/recent-code-documentation.md`
+
 Planned next steps:
 
 - data ingestion and binary label mapping

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Dict
 import pandas as pd
 from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
 from lesionshiftai.core.config import ExperimentConfig
 from lesionshiftai.core.reproducibility import init_generator, seed_worker
 from lesionshiftai.data.dataset import LesionDataset
@@ -18,9 +19,16 @@ class DataBundle:
     train_df: pd.DataFrame
     val_df: pd.DataFrame
     test_df: pd.DataFrame
+    train_sampler: DistributedSampler | None
+    val_sampler: DistributedSampler | None
+    test_sampler: DistributedSampler | None
 
 
-def build_data_bundle(cfg: ExperimentConfig) -> DataBundle:
+def build_data_bundle(
+    cfg: ExperimentConfig,
+    world_size: int = 1,
+    rank: int = 0
+) -> DataBundle:
     isic_df = load_isic_metadata(cfg.data.isic_root)
     ham_df = load_ham_metadata(cfg.data.ham_root)
 
@@ -45,22 +53,52 @@ def build_data_bundle(cfg: ExperimentConfig) -> DataBundle:
         "persistent_workers": cfg.data.num_workers > 0
     }
 
+    # handle multiple GPUs for training, testing, validation
+    train_sampler = None
+    val_sampler = None
+    test_sampler = None
+    if world_size > 1:
+        train_sampler = DistributedSampler(
+            train_ds,
+            num_replicas=world_size,
+            rank=rank,
+            shuffle=True,
+            seed=cfg.seed
+        )
+        val_sampler = DistributedSampler(
+            val_ds,
+            num_replicas=world_size,
+            rank=rank,
+            shuffle=False,
+            seed=cfg.seed
+        )
+        test_sampler = DistributedSampler(
+            test_ds,
+            num_replicas=world_size,
+            rank=rank,
+            shuffle=False,
+            seed=cfg.seed
+        )
+
     train_loader = DataLoader(
         train_ds,
-        shuffle=True,
-        generator=init_generator(cfg.seed),
+        shuffle=train_sampler is None,
+        sampler=train_sampler,
+        generator=init_generator(cfg.seed + rank),
         **common_loader_args
     )
     val_loader = DataLoader(
         val_ds,
         shuffle=False,
-        generator=init_generator(cfg.seed + 1),
+        sampler=val_sampler,
+        generator=init_generator(cfg.seed + 100 + rank),
         **common_loader_args
     )
     test_loader = DataLoader(
         test_ds,
         shuffle=False,
-        generator=init_generator(cfg.seed + 2),
+        sampler=test_sampler,
+        generator=init_generator(cfg.seed + 200 + rank),
         **common_loader_args
     )
 
@@ -70,7 +108,10 @@ def build_data_bundle(cfg: ExperimentConfig) -> DataBundle:
         test_loader=test_loader,
         train_df=train_df,
         val_df=val_df,
-        test_df=ham_df
+        test_df=ham_df,
+        train_sampler=train_sampler,
+        val_sampler=val_sampler,
+        test_sampler=test_sampler
     )
 
 
