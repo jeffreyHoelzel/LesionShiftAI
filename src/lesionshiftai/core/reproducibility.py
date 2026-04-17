@@ -5,6 +5,10 @@ import torch
 
 
 def set_seed(seed: int, deterministic: bool = True) -> None:
+    if deterministic:
+        # required for deterministic GEMM ops on CUDA >= 10.2.
+        os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+
     os.environ["PYTHONHASHSEED"] = str(seed)
     random.seed(seed)
     np.random.seed(seed)

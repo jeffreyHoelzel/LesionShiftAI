@@ -1,10 +1,13 @@
 import argparse
+import os
 from pathlib import Path
+
 import torch
 import torch.distributed as dist
 from torch import nn
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import AdamW
+
 from lesionshiftai.core.config import load_config
 from lesionshiftai.core.distributed import barrier, cleanup_dist, setup_dist
 from lesionshiftai.core.reproducibility import set_seed
@@ -32,11 +35,12 @@ def main() -> None:
     p.add_argument("--threshold", default=0.5, type=float)
     args = p.parse_args()
 
+    cfg = load_config(args.config)
+    process_rank = int(os.environ.get("RANK", "0"))
+    set_seed(cfg.seed + process_rank, cfg.deterministic)
+
     dist_state = setup_dist()
     try:
-        cfg = load_config(args.config)
-        set_seed(cfg.seed + dist_state.rank, cfg.deterministic)
-
         run_dir = create_run_dir(
             cfg, args.config) if dist_state.is_main else None
         run_dir_box = [str(run_dir) if run_dir is not None else ""]
