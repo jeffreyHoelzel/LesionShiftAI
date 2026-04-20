@@ -16,6 +16,13 @@ source "$(conda info --base)/etc/profile.d/conda.sh"
 ENV_PREFIX=${ENV_PREFIX:-/scratch/$USER/conda/envs/lesionshiftai}
 conda activate "$ENV_PREFIX"
 
+# point to correct dependencies in environment
+export PYTHONNOUSERSITE=1
+unset PYTHONPATH
+export LD_LIBRARY_PATH="$CONDA_PREFIX/lib:${LD_LIBRARY_PATH:-}"
+# required for deterministic CUDA linear algebra when cfg.deterministic=true
+export CUBLAS_WORKSPACE_CONFIG=${CUBLAS_WORKSPACE_CONFIG:-:4096:8}
+
 NPROC_PER_NODE=${NPROC_PER_NODE:-${SLURM_GPUS_ON_NODE##*:}}
 if ! [[ "$NPROC_PER_NODE" =~ ^[0-9]+$ ]]; then
     # let torchrun infer count from visible GPUs when SLURM format is non-numeric.

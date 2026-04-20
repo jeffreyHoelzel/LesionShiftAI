@@ -28,6 +28,8 @@ def build_pyz(output: Path) -> None:
         _copytree(ROOT / "src" / "lesionshiftai", stage / "lesionshiftai")
 
         # script entry modules called by launcher
+        shutil.copy2(ROOT / "scripts" / "train_ensemble_member_cnn.py",
+                     stage / "train_ensemble_member_cnn.py")
         shutil.copy2(ROOT / "scripts" / "train_baseline_cnn.py",
                      stage / "train_baseline_cnn.py")
         shutil.copy2(ROOT / "scripts" / "smoke_data_pipeline.py",
