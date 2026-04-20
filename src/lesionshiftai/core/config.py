@@ -21,6 +21,8 @@ class TrainConfig:
     epochs: int = 20
     lr: float = 3e-4
     weight_decay: float = 1e-4
+    warmup_epochs: int = 3
+    min_lr: float = 1e-6
 
 
 @dataclass(slots=True)
@@ -75,7 +77,9 @@ def load_config(path: str | Path) -> ExperimentConfig:
         train=TrainConfig(
             epochs=int(train_raw.get("epochs", 20)),
             lr=float(train_raw.get("lr", 3e-4)),
-            weight_decay=float(train_raw.get("weight_decay", 1e-4))
+            weight_decay=float(train_raw.get("weight_decay", 1e-4)),
+            warmup_epochs=int(train_raw.get("warmup_epochs", 3)),
+            min_lr=float(train_raw.get("min_lr", 1e-6))
         )
     )
     _val_config(cfg)
@@ -90,3 +94,17 @@ def _val_config(cfg: ExperimentConfig) -> None:
         raise ValueError("data.batch_size must be >= 1")
     if cfg.data.image_size < 64:
         raise ValueError("data.image_size must be >= 64")
+    if cfg.train.epochs < 1:
+        raise ValueError("train.epochs must be >= 1")
+    if cfg.train.lr <= 0.0:
+        raise ValueError("train.lr must be > 0")
+    if cfg.train.weight_decay < 0.0:
+        raise ValueError("train.weight_decay must be >= 0")
+    if cfg.train.warmup_epochs < 0:
+        raise ValueError("train.warmup_epochs must be >= 0")
+    if cfg.train.warmup_epochs > cfg.train.epochs:
+        raise ValueError("train.warmup_epochs must be <= train.epochs")
+    if cfg.train.min_lr < 0.0:
+        raise ValueError("train.min_lr must be >= 0")
+    if cfg.train.min_lr > cfg.train.lr:
+        raise ValueError("train.min_lr must be <= train.lr")

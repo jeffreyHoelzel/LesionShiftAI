@@ -1,14 +1,14 @@
 #!/bin/bash
-#SBATCH --job-name=train-baseline-cnn
+#SBATCH --job-name=train-vit-b16
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=16
 #SBATCH --gpus-per-node=h200:2
-#SBATCH --mem=64G
+#SBATCH --mem=256G
 #SBATCH --time=12:00:00
-#SBATCH --output=/scratch/%u/train_baseline_cnn/output/%x_%j.out
-#SBATCH --error=/scratch/%u/train_baseline_cnn/error/%x_%j.err
+#SBATCH --output=/scratch/%u/train_vit/output/%x_%j.out
+#SBATCH --error=/scratch/%u/train_vit/error/%x_%j.err
 
 module purge
 module load anaconda3
@@ -32,5 +32,5 @@ fi
 srun torchrun \
     --standalone \
     --nproc_per_node="$NPROC_PER_NODE" \
-    lesionshiftai.pyz train-baseline \
-    --config baseline_cnn.yml
+    lesionshiftai.pyz train-vit \
+    --config vit_b16.yml
