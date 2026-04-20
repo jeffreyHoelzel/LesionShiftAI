@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass
 from typing import Any, List
+
 import torch
 import torch.distributed as dist
 
@@ -31,6 +32,16 @@ def setup_dist() -> DistState:
 
     # determine if GPUs available before distribution
     if torch.cuda.is_available():
+        device_count = torch.cuda.device_count()
+        if local_rank < 0 or local_rank >= device_count:
+            visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "<unset>")
+            raise RuntimeError(
+                f"LOCAL_RANK={local_rank} is out of range for {device_count} visible "
+                "CUDA device(s). "
+                f"(RANK={rank}, WORLD_SIZE={world_size}, "
+                f"CUDA_VISIBLE_DEVICES={visible_devices}). "
+                "Match torchrun --nproc_per_node to visible GPUs per task."
+            )
         torch.cuda.set_device(local_rank)
         backend = "nccl"
         device = torch.device("cuda", local_rank)

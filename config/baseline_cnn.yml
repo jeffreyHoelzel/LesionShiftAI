@@ -1,11 +1,11 @@
 experiment_name: baseline_cnn_isic_to_ham
-output_root: /scratch/<USER>/lesionshiftai/outputs
+output_root: "/scratch/$USER/lesionshiftai/outputs"
 seed: 42
 deterministic: true
 
 data:
-  isic_root: "/scratch/<USER>/lesionshiftai/data/ISIC 2019"
-  ham_root: "/scratch/<USER>/lesionshiftai/data/HAM10000"
+  isic_root: "/scratch/$USER/lesionshiftai/data/ISIC 2019"
+  ham_root: "/scratch/$USER/lesionshiftai/data/HAM10000"
   image_size: 224
   val_size: 0.20
   batch_size: 32
