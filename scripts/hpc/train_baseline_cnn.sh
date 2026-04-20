@@ -11,10 +11,17 @@
 #SBATCH --error=/scratch/%u/train_baseline_cnn/error/%x_%j.err
 
 module purge
-module load mamba
+module load anaconda3
 source "$(conda info --base)/etc/profile.d/conda.sh"
 ENV_PREFIX=${ENV_PREFIX:-/scratch/$USER/conda/envs/lesionshiftai}
-mamba activate "$ENV_PREFIX"
+conda activate "$ENV_PREFIX"
+
+# Point to correct dependencies in environment
+export PYTHONNOUSERSITE=1
+unset PYTHONPATH
+export LD_LIBRARY_PATH="$CONDA_PREFIX/lib:${LD_LIBRARY_PATH:-}"
+# Required for deterministic CUDA linear algebra when cfg.deterministic=true
+export CUBLAS_WORKSPACE_CONFIG=${CUBLAS_WORKSPACE_CONFIG:-:4096:8}
 
 # get number of GPUs being used on node
 GPUS=${SLURM_GPUS_ON_NODE##*:}

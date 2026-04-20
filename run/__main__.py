@@ -1,9 +1,13 @@
 import argparse
 import sys
+
 from smoke_data_pipeline import main as smoke_data_main
 from train_baseline_cnn import main as train_baseline_main
+from train_ensemble_member_cnn import main as train_ensemble_member_main
 
 COMMANDS = {
+    "train-ensemble": train_ensemble_member_main,
+    "train-ensemble-member": train_ensemble_member_main,
     "train-baseline": train_baseline_main,
     "smoke-data": smoke_data_main
 }
