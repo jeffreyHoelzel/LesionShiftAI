@@ -1,16 +1,20 @@
 import argparse
+import importlib
 import sys
 
-from smoke_data_pipeline import main as smoke_data_main
-from train_baseline_cnn import main as train_baseline_main
-from train_ensemble_member_cnn import main as train_ensemble_member_main
-
 COMMANDS = {
-    "train-ensemble": train_ensemble_member_main,
-    "train-ensemble-member": train_ensemble_member_main,
-    "train-baseline": train_baseline_main,
-    "smoke-data": smoke_data_main
+    "train-ensemble": ("train_ensemble_member_cnn", "main"),
+    "train-ensemble-member": ("train_ensemble_member_cnn", "main"),
+    "train-baseline": ("train_baseline_cnn", "main"),
+    "train-vit": ("train_vit", "main"),
+    "smoke-data": ("smoke_data_pipeline", "main")
 }
+
+
+def _resolve_command(command: str):
+    module_name, fn_name = COMMANDS[command]
+    module = importlib.import_module(module_name)
+    return getattr(module, fn_name)
 
 
 def main() -> None:
@@ -21,7 +25,7 @@ def main() -> None:
 
     # forward remaining args to target script main()
     sys.argv = [ns.command, *ns.args]
-    COMMANDS[ns.command]()
+    _resolve_command(ns.command)()
 
 
 if __name__ == "__main__":

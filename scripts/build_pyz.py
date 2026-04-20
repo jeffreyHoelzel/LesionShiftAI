@@ -32,6 +32,8 @@ def build_pyz(output: Path) -> None:
                      stage / "train_ensemble_member_cnn.py")
         shutil.copy2(ROOT / "scripts" / "train_baseline_cnn.py",
                      stage / "train_baseline_cnn.py")
+        shutil.copy2(ROOT / "scripts" / "train_vit.py",
+                     stage / "train_vit.py")
         shutil.copy2(ROOT / "scripts" / "smoke_data_pipeline.py",
                      stage / "smoke_data_pipeline.py")
 
