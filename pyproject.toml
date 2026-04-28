@@ -33,6 +33,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
+    "pytest-cov>=5.0",
     "black>=24.0",
     "ruff>=0.3",
     "mypy>=1.8"
@@ -58,3 +59,8 @@ select = ["E", "F", "I", "B"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+addopts = "--strict-markers -ra -p no:cacheprovider --cov=src/lesionshiftai --cov-report=term-missing --cov-fail-under=85"
+markers = [
+    "unit: fast, isolated unit tests",
+    "integration: integration smoke tests"
+]
