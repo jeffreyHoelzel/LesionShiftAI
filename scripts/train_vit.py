@@ -14,6 +14,7 @@ from lesionshiftai.core.config import ExperimentConfig, load_config
 from lesionshiftai.core.distributed import barrier, cleanup_dist, setup_dist
 from lesionshiftai.core.reproducibility import set_seed
 from lesionshiftai.core.runtime import create_run_dir, write_json
+from lesionshiftai.eval.curves import write_binary_curve_artifacts
 
 
 def _unwrap_model(model: torch.nn.Module) -> torch.nn.Module:
@@ -292,6 +293,23 @@ def main() -> None:
         if dist_state.is_main:
             val_preds.to_csv(run_dir / "predictions" / "val_final.csv", index=False)
             test_preds.to_csv(run_dir / "predictions" / "ham_test.csv", index=False)
+            curves_dir = run_dir / "metrics" / "curves"
+            write_binary_curve_artifacts(
+                y_true=val_preds["label"].to_numpy(dtype=int),
+                y_prob=val_preds["prob_malignant"].to_numpy(dtype=float),
+                output_dir=curves_dir,
+                split_name="val_final",
+                model_scope="vit",
+                extra_metadata={"threshold": float(args.threshold)},
+            )
+            write_binary_curve_artifacts(
+                y_true=test_preds["label"].to_numpy(dtype=int),
+                y_prob=test_preds["prob_malignant"].to_numpy(dtype=float),
+                output_dir=curves_dir,
+                split_name="ham_test",
+                model_scope="vit",
+                extra_metadata={"threshold": float(args.threshold)},
+            )
 
             write_json(run_dir / "metrics" / "history.json", {"epochs": history})
             write_json(run_dir / "metrics" / "val_metrics.json", val_metrics)
