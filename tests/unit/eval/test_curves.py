@@ -5,6 +5,7 @@ import pytest
 
 from lesionshiftai.eval.curves import (
     write_binary_curve_artifacts,
+    write_fold_auc_history_overlay_artifacts,
     write_fold_curve_overlay_artifacts,
 )
 
@@ -94,3 +95,54 @@ def test_write_fold_curve_overlay_artifacts_handles_no_valid_folds(tmp_path: Pat
     assert payload["status"] == "skipped_no_valid_folds"
     parsed = json.loads((tmp_path / "ham_test_member_folds_curves.json").read_text(encoding="utf-8"))
     assert parsed["reason"] == "no_valid_fold_curve_payloads"
+
+
+def test_write_fold_auc_history_overlay_artifacts_success(tmp_path: Path) -> None:
+    fold_history_payloads = [
+        {
+            "fold_index": 0,
+            "epochs": [
+                {"epoch": 1, "val": {"roc_auc": 0.72, "pr_auc": 0.55}},
+                {"epoch": 2, "val": {"roc_auc": 0.78, "pr_auc": 0.61}},
+            ],
+        },
+        {
+            "fold_index": 1,
+            "epochs": [
+                {"epoch": 1, "val": {"roc_auc": 0.7, "pr_auc": 0.52}},
+                {"epoch": 2, "val": {"roc_auc": 0.75, "pr_auc": 0.6}},
+            ],
+        },
+    ]
+
+    payload = write_fold_auc_history_overlay_artifacts(
+        fold_history_payloads=fold_history_payloads,
+        output_dir=tmp_path,
+        split_name="isic_val_member_folds",
+        model_scope="ensemble_member_folds",
+    )
+
+    assert payload["status"] == "ok"
+    assert payload["n_folds_plotted"] == 2
+    assert (tmp_path / "isic_val_member_folds_auc_history.json").exists()
+    assert (tmp_path / "isic_val_member_folds_roc_auc_history.png").exists()
+    assert (tmp_path / "isic_val_member_folds_pr_auc_history.png").exists()
+
+
+def test_write_fold_auc_history_overlay_artifacts_handles_no_valid_folds(
+    tmp_path: Path,
+) -> None:
+    payload = write_fold_auc_history_overlay_artifacts(
+        fold_history_payloads=[{"fold_index": 0, "epochs": []}],
+        output_dir=tmp_path,
+        split_name="isic_val_member_folds",
+        model_scope="ensemble_member_folds",
+    )
+
+    assert payload["status"] == "skipped_no_valid_folds"
+    parsed = json.loads(
+        (tmp_path / "isic_val_member_folds_auc_history.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert parsed["reason"] == "no_valid_fold_auc_histories"

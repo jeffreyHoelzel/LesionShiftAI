@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 import matplotlib
-import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.metrics import (
     average_precision_score,
@@ -13,6 +12,7 @@ from sklearn.metrics import (
 )
 
 matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 
 def write_binary_curve_artifacts(
@@ -220,6 +220,116 @@ def write_fold_curve_overlay_artifacts(
     return payload
 
 
+def write_fold_auc_history_overlay_artifacts(
+    fold_history_payloads: List[Dict[str, Any]],
+    output_dir: str | Path,
+    split_name: str,
+    model_scope: str,
+    extra_metadata: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    """Write fold-level ROC AUC / PR AUC-over-epoch overlay plots."""
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    payload: Dict[str, Any] = {
+        "status": "ok",
+        "split": split_name,
+        "model_scope": model_scope,
+        "n_folds_requested": int(len(fold_history_payloads)),
+    }
+    if extra_metadata:
+        payload.update(extra_metadata)
+
+    fold_histories: list[dict[str, Any]] = []
+    skipped_folds: list[dict[str, Any]] = []
+
+    for idx, fold_payload in enumerate(fold_history_payloads):
+        fold_index_raw = fold_payload.get("fold_index")
+        fold_index = int(fold_index_raw) if fold_index_raw is not None else idx
+        epoch_rows = fold_payload.get("epochs")
+        if not isinstance(epoch_rows, list):
+            skipped_folds.append(
+                {"fold_index": fold_index, "reason": "missing_epochs_list"}
+            )
+            continue
+
+        per_epoch: dict[int, tuple[float, float]] = {}
+        for row in epoch_rows:
+            if not isinstance(row, dict):
+                continue
+            epoch_raw = row.get("epoch")
+            val_metrics = row.get("val")
+            if epoch_raw is None or not isinstance(val_metrics, dict):
+                continue
+            try:
+                epoch = int(epoch_raw)
+                roc_auc = float(val_metrics["roc_auc"])
+                pr_auc = float(val_metrics["pr_auc"])
+            except (TypeError, ValueError, KeyError):
+                continue
+            if not np.isfinite(roc_auc) or not np.isfinite(pr_auc):
+                continue
+            per_epoch[epoch] = (roc_auc, pr_auc)
+
+        if not per_epoch:
+            skipped_folds.append(
+                {"fold_index": fold_index, "reason": "no_valid_auc_history_rows"}
+            )
+            continue
+
+        ordered_epochs = sorted(per_epoch.keys())
+        roc_auc_values = [float(per_epoch[epoch][0]) for epoch in ordered_epochs]
+        pr_auc_values = [float(per_epoch[epoch][1]) for epoch in ordered_epochs]
+        fold_histories.append(
+            {
+                "fold_index": int(fold_index),
+                "epochs": ordered_epochs,
+                "roc_auc": roc_auc_values,
+                "pr_auc": pr_auc_values,
+            }
+        )
+
+    fold_histories.sort(key=lambda row: row["fold_index"])
+    payload["n_folds_plotted"] = int(len(fold_histories))
+    payload["skipped_folds"] = skipped_folds
+    payload["folds"] = [
+        {
+            "fold_index": int(row["fold_index"]),
+            "n_epochs": int(len(row["epochs"])),
+            "first_epoch": int(row["epochs"][0]),
+            "last_epoch": int(row["epochs"][-1]),
+            "roc_auc_last": float(row["roc_auc"][-1]),
+            "pr_auc_last": float(row["pr_auc"][-1]),
+        }
+        for row in fold_histories
+    ]
+
+    overlay_json_path = output_path / f"{split_name}_auc_history.json"
+    if not fold_histories:
+        payload["status"] = "skipped_no_valid_folds"
+        payload["reason"] = "no_valid_fold_auc_histories"
+        overlay_json_path.write_text(_to_json(payload), encoding="utf-8")
+        return payload
+
+    _plot_fold_auc_history(
+        output_path=output_path / f"{split_name}_roc_auc_history.png",
+        split_name=split_name,
+        metric_name="ROC AUC",
+        fold_histories=fold_histories,
+        metric_key="roc_auc",
+    )
+    _plot_fold_auc_history(
+        output_path=output_path / f"{split_name}_pr_auc_history.png",
+        split_name=split_name,
+        metric_name="PR AUC",
+        fold_histories=fold_histories,
+        metric_key="pr_auc",
+    )
+
+    overlay_json_path.write_text(_to_json(payload), encoding="utf-8")
+    return payload
+
+
 def _to_float_array(values: Any) -> np.ndarray:
     if values is None:
         return np.asarray([], dtype=float)
@@ -366,6 +476,39 @@ def _plot_fold_pr_curves(
     ax.set_ylim(0.0, 1.0)
     ax.grid(alpha=0.3)
     ax.legend(loc="lower left")
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=180)
+    plt.close(fig)
+
+
+def _plot_fold_auc_history(
+    output_path: Path,
+    split_name: str,
+    metric_name: str,
+    fold_histories: List[dict[str, Any]],
+    metric_key: str,
+) -> None:
+    fig, ax = plt.subplots(figsize=(8, 6))
+    for row in fold_histories:
+        fold_number = int(row["fold_index"]) + 1
+        epochs = row["epochs"]
+        metric_values = row[metric_key]
+        final_value = float(metric_values[-1])
+        ax.plot(
+            epochs,
+            metric_values,
+            linewidth=2,
+            marker="o",
+            markersize=3,
+            label=f"Fold {fold_number} | Final: {final_value:.3f}",
+        )
+
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel(metric_name)
+    ax.set_title(f"{metric_name} by Epoch ({split_name})")
+    ax.set_ylim(0.0, 1.0)
+    ax.grid(alpha=0.3)
+    ax.legend(loc="lower right")
     fig.tight_layout()
     fig.savefig(output_path, dpi=180)
     plt.close(fig)
