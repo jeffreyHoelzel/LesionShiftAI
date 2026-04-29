@@ -76,5 +76,11 @@ def test_train_ensemble_smoke(
 
     assert (agg_curves_dir / "isic_val_aggregate_curves.json").exists()
     assert (agg_curves_dir / "isic_val_member_folds_curves.json").exists()
+    assert (agg_curves_dir / "isic_val_member_folds_auc_history.json").exists()
+    assert (agg_curves_dir / "isic_val_member_folds_roc_auc_history.png").exists()
+    assert (agg_curves_dir / "isic_val_member_folds_pr_auc_history.png").exists()
     assert (agg_curves_dir / "ham_test_aggregate_curves.json").exists()
     assert (agg_curves_dir / "ham_test_member_folds_curves.json").exists()
+    assert (agg_curves_dir / "ham_test_member_folds_auc_history.json").exists()
+    assert (agg_curves_dir / "ham_test_member_folds_roc_auc_history.png").exists()
+    assert (agg_curves_dir / "ham_test_member_folds_pr_auc_history.png").exists()

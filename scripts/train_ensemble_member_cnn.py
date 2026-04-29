@@ -22,6 +22,7 @@ from lesionshiftai.data.split import summarize_fold_assignment
 from lesionshiftai.data.transforms import build_eval_transform
 from lesionshiftai.eval.curves import (
     write_binary_curve_artifacts,
+    write_fold_auc_history_overlay_artifacts,
     write_fold_curve_overlay_artifacts,
 )
 from lesionshiftai.eval.evaluator import evaluate_loader, generalization_gap
@@ -122,9 +123,11 @@ def _write_ensemble_validation_if_ready(
     all_val_preds = []
     member_summary_rows = []
     member_curve_payloads = []
+    member_history_payloads = []
     all_test_preds = []
     member_test_summary_rows = []
     member_test_curve_payloads = []
+    member_test_history_payloads = []
     required_cols = {"sample_id", "dataset", "label", "prob_malignant", "pred_label"}
 
     for fold_index in range(num_folds):
@@ -132,6 +135,8 @@ def _write_ensemble_validation_if_ready(
         preds_path = member_dir / "predictions" / "val_final.csv"
         metrics_path = member_dir / "metrics" / "val_metrics.json"
         curve_path = member_dir / "metrics" / "curves" / "val_final_curves.json"
+        history_path = member_dir / "metrics" / "history.json"
+        best_epoch_path = member_dir / "metrics" / "best_epoch.json"
         test_preds_path = member_dir / "predictions" / "ham_test.csv"
         test_metrics_path = member_dir / "metrics" / "test_metrics.json"
         test_curve_path = member_dir / "metrics" / "curves" / "ham_test_curves.json"
@@ -157,6 +162,14 @@ def _write_ensemble_validation_if_ready(
         member_curve_payloads.append(
             json.loads(curve_path.read_text(encoding="utf-8"))
         )
+        history_payload = {"fold_index": int(fold_index), "epochs": []}
+        if history_path.exists():
+            history_rows = json.loads(
+                history_path.read_text(encoding="utf-8")
+            ).get("epochs", [])
+            if isinstance(history_rows, list):
+                history_payload["epochs"] = history_rows
+        member_history_payloads.append(history_payload)
         member_summary = {
             "member_fold": int(fold_index),
             "n_val_samples": int(len(val_preds))
@@ -184,6 +197,33 @@ def _write_ensemble_validation_if_ready(
         member_test_metrics = json.loads(test_metrics_path.read_text(encoding="utf-8"))
         member_test_curve_payloads.append(
             json.loads(test_curve_path.read_text(encoding="utf-8"))
+        )
+        best_epoch = None
+        if best_epoch_path.exists():
+            best_epoch_val = json.loads(
+                best_epoch_path.read_text(encoding="utf-8")
+            ).get("best_epoch")
+            if best_epoch_val is not None:
+                best_epoch = int(best_epoch_val)
+        if best_epoch is None:
+            best_epoch = (
+                int(history_payload["epochs"][-1]["epoch"])
+                if history_payload["epochs"]
+                else 1
+            )
+        member_test_history_payloads.append(
+            {
+                "fold_index": int(fold_index),
+                "epochs": [
+                    {
+                        "epoch": int(best_epoch),
+                        "val": {
+                            "roc_auc": member_test_metrics.get("roc_auc"),
+                            "pr_auc": member_test_metrics.get("pr_auc"),
+                        },
+                    }
+                ],
+            }
         )
         member_test_summary = {
             "member_fold": int(fold_index),
@@ -240,6 +280,16 @@ def _write_ensemble_validation_if_ready(
     )
     write_fold_curve_overlay_artifacts(
         fold_curve_payloads=member_curve_payloads,
+        output_dir=metrics_dir / "curves",
+        split_name="isic_val_member_folds",
+        model_scope="ensemble_member_folds",
+        extra_metadata={
+            "ensemble_run_id": ensemble_run_id,
+            "num_folds": int(num_folds),
+        },
+    )
+    write_fold_auc_history_overlay_artifacts(
+        fold_history_payloads=member_history_payloads,
         output_dir=metrics_dir / "curves",
         split_name="isic_val_member_folds",
         model_scope="ensemble_member_folds",
@@ -348,6 +398,16 @@ def _write_ensemble_validation_if_ready(
     )
     write_fold_curve_overlay_artifacts(
         fold_curve_payloads=member_test_curve_payloads,
+        output_dir=metrics_dir / "curves",
+        split_name="ham_test_member_folds",
+        model_scope="ensemble_member_folds",
+        extra_metadata={
+            "ensemble_run_id": ensemble_run_id,
+            "num_folds": int(num_folds),
+        },
+    )
+    write_fold_auc_history_overlay_artifacts(
+        fold_history_payloads=member_test_history_payloads,
         output_dir=metrics_dir / "curves",
         split_name="ham_test_member_folds",
         model_scope="ensemble_member_folds",

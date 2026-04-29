@@ -72,6 +72,25 @@ def _seed_member_artifacts(ensemble_root: Path, num_folds: int) -> None:
         (member_dir / "metrics" / "member_complete.json").write_text(
             json.dumps({"status": "complete", "fold_index": fold}), encoding="utf-8"
         )
+        (member_dir / "metrics" / "history.json").write_text(
+            json.dumps(
+                {
+                    "epochs": [
+                        {
+                            "epoch": 1,
+                            "train": {"loss": 0.6},
+                            "val": {"roc_auc": 0.72, "pr_auc": 0.58},
+                        },
+                        {
+                            "epoch": 2,
+                            "train": {"loss": 0.5},
+                            "val": {"roc_auc": 0.8, "pr_auc": 0.66},
+                        },
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
 
         val_curve = {
             "status": "ok",
@@ -140,8 +159,14 @@ def test_write_ensemble_validation_completed(tmp_path: Path) -> None:
     curves_dir = ensemble_root / "ensemble" / "metrics" / "curves"
     assert (curves_dir / "isic_val_aggregate_curves.json").exists()
     assert (curves_dir / "isic_val_member_folds_curves.json").exists()
+    assert (curves_dir / "isic_val_member_folds_auc_history.json").exists()
+    assert (curves_dir / "isic_val_member_folds_roc_auc_history.png").exists()
+    assert (curves_dir / "isic_val_member_folds_pr_auc_history.png").exists()
     assert (curves_dir / "ham_test_aggregate_curves.json").exists()
     assert (curves_dir / "ham_test_member_folds_curves.json").exists()
+    assert (curves_dir / "ham_test_member_folds_auc_history.json").exists()
+    assert (curves_dir / "ham_test_member_folds_roc_auc_history.png").exists()
+    assert (curves_dir / "ham_test_member_folds_pr_auc_history.png").exists()
 
     metrics_dir = ensemble_root / "ensemble" / "metrics"
     assert (metrics_dir / "isic_val_aggregate_metrics.json").exists()
