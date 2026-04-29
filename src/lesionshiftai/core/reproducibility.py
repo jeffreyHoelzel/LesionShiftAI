@@ -1,3 +1,8 @@
+"""reproducibility.py
+
+Handles all reproducibility aspects of training and testing 
+like setting seeds and starting generators.
+"""
 import os
 import random
 import numpy as np
@@ -5,8 +10,28 @@ import torch
 
 
 def set_seed(seed: int, deterministic: bool = True) -> None:
+    """
+    Sets random seeds across Python, NumPy, and PyTorch for reproducible execution.
+
+    Parameters
+    ------------
+        seed : int
+            Seed value used to initialize random number generators.
+        deterministic : bool
+            Whether to enable deterministic PyTorch and cuDNN behavior.
+
+    Returns
+    --------
+        None : None
+            This function does not return a value.
+
+    Raises
+    -------
+        RuntimeError
+            Raised when deterministic PyTorch algorithms are enabled but an operation does not support deterministic execution.
+    """
     if deterministic:
-        # required for deterministic GEMM ops on CUDA >= 10.2.
+        # required for deterministic
         os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 
     os.environ["PYTHONHASHSEED"] = str(seed)
@@ -22,13 +47,38 @@ def set_seed(seed: int, deterministic: bool = True) -> None:
 
 
 def seed_worker(_: int) -> None:
-    """Seed worker wrapper to fit function signature expected in DataLoader."""
+    """
+    Seeds a DataLoader worker process.
+
+    Parameters
+    ------------
+        _ : int
+            Worker ID provided by the DataLoader.
+    """
     worker_seed = torch.initial_seed() % 2 ** 32
     np.random.seed(worker_seed)
     random.seed(worker_seed)
 
 
 def init_generator(seed: int) -> torch.Generator:
+    """
+    Initializes a seeded PyTorch random number generator.
+
+    Parameters
+    ------------
+        seed : int
+            Seed value used to initialize the generator.
+
+    Returns
+    --------
+        gen : torch.Generator
+            Seeded PyTorch generator.
+
+    Raises
+    -------
+        RuntimeError
+            Raised when PyTorch fails to initialize or seed the generator.
+    """
     gen = torch.Generator()
     gen.manual_seed(seed)
     return gen

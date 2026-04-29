@@ -1,13 +1,43 @@
+"""distributed.py
+
+Core DDP helper that maintains multi-GPU distributed training, 
+validation, and testing.
+"""
 import os
 from dataclasses import dataclass
 from typing import Any, List
-
 import torch
 import torch.distributed as dist
 
 
 @dataclass(slots=True)
 class DistState:
+    """
+    Stores distributed training process state.
+
+    Parameters
+    ------------
+        enabled : bool
+            Whether distributed training is enabled.
+        rank : int
+            Global process rank.
+        world_size : int
+            Total number of distributed processes.
+        local_rank : int
+            Process rank on the current node.
+        device : torch.device
+            Torch device assigned to the current process.
+
+    Returns
+    --------
+        DistState : DistState
+            Dataclass instance containing distributed process state.
+
+    Raises
+    -------
+        TypeError
+            Raised when required fields are missing or incompatible values are provided.
+    """
     enabled: bool
     rank: int
     world_size: int
@@ -16,10 +46,38 @@ class DistState:
 
     @property
     def is_main(self) -> bool:
+        """
+        Checks whether the current process is the main process.
+
+        Returns
+        --------
+            is_main : bool
+                True when the current process rank is 0, otherwise False.
+        """
         return self.rank == 0
 
 
 def setup_dist() -> DistState:
+    """
+    Initializes distributed training state and selects the process device.
+
+    Parameters
+    ------------
+        None : None
+            This function does not accept parameters.
+
+    Returns
+    --------
+        dist_state : DistState
+            Distributed process state containing rank, world size, local rank, and device.
+
+    Raises
+    -------
+        KeyError
+            Raised when required distributed environment variables are missing.
+        RuntimeError
+            Raised when LOCAL_RANK is outside the range of visible CUDA devices.
+    """
     world_size = int(os.environ.get("WORLD_SIZE", "1"))
 
     # only one GPU running training, eval, inference, etc.
@@ -54,16 +112,36 @@ def setup_dist() -> DistState:
 
 
 def cleanup_dist() -> None:
+    """Destroys the active distributed process group."""
     if dist.is_available() and dist.is_initialized():
         dist.destroy_process_group()
 
 
 def barrier() -> None:
+    """Synchronizes all initialized distributed processes."""
     if dist.is_available() and dist.is_initialized():
         dist.barrier()
 
 
 def all_gather_object(obj: Any) -> List[Any]:
+    """
+    Gathers a Python object from every distributed process.
+
+    Parameters
+    ------------
+        obj : Any
+            Python object to gather from the current process.
+
+    Returns
+    --------
+        gathered : List[Any]
+            List containing one gathered object from each distributed process.
+
+    Raises
+    -------
+        RuntimeError
+            Raised when distributed object gathering fails.
+    """
     if not (dist.is_available() and dist.is_initialized()):
         return [obj]
     gathered = [None for _ in range(dist.get_world_size())]

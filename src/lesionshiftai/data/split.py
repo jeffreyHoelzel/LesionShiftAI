@@ -1,3 +1,7 @@
+"""split.py
+
+Partitions the dataset from training and validation.
+"""
 from typing import Any, Dict, Tuple
 import numpy as np
 import pandas as pd
@@ -5,7 +9,7 @@ from sklearn.model_selection import (
     GroupShuffleSplit,
     StratifiedGroupKFold,
     StratifiedKFold,
-    train_test_split,
+    train_test_split
 )
 
 
@@ -14,6 +18,30 @@ def split_isic_train_val(
     val_size: float = 0.20,
     seed: int = 42
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Splits ISIC metadata into training and validation sets.
+
+    Parameters
+    ------------
+        isic_df : pd.DataFrame
+            ISIC metadata DataFrame containing sample IDs, patient IDs, and labels.
+        val_size : float
+            Fraction of samples reserved for validation.
+        seed : int
+            Random seed used for reproducible splitting.
+
+    Returns
+    --------
+        splits : Tuple[pd.DataFrame, pd.DataFrame]
+            Training and validation metadata DataFrames.
+
+    Raises
+    -------
+        ValueError
+            Raised when val_size is not between 0 and 0.5.
+        RuntimeError
+            Raised when sample leakage is detected or one split is missing a class.
+    """
     if not 0.0 < val_size < 0.5:
         raise ValueError("`val_size` must be between 0 and 0.5")
 
@@ -56,6 +84,30 @@ def assign_isic_folds(
     num_folds: int = 5,
     seed: int = 42
 ) -> pd.DataFrame:
+    """
+    Assigns each ISIC sample to a stratified fold.
+
+    Parameters
+    ------------
+        isic_df : pd.DataFrame
+            ISIC metadata DataFrame containing patient IDs and binary labels.
+        num_folds : int
+            Number of folds to create.
+        seed : int
+            Random seed used for reproducible fold assignment.
+
+    Returns
+    --------
+        out : pd.DataFrame
+            ISIC metadata DataFrame with an added fold column.
+
+    Raises
+    -------
+        ValueError
+            Raised when num_folds is less than 2 or exceeds the number of rows.
+        RuntimeError
+            Raised when fold assignment fails validation.
+    """
     if num_folds < 2:
         raise ValueError("`num_folds` must be >= 2")
     if len(isic_df) < num_folds:
@@ -104,6 +156,26 @@ def summarize_fold_assignment(
     fold_df: pd.DataFrame,
     num_folds: int
 ) -> Dict[str, Any]:
+    """
+    Summarizes sample and class counts for each assigned fold.
+
+    Parameters
+    ------------
+        fold_df : pd.DataFrame
+            DataFrame containing fold assignments and labels.
+        num_folds : int
+            Number of folds expected in the assignment.
+
+    Returns
+    --------
+        summary : Dict[str, Any]
+            Dictionary containing total sample count and per-fold class counts.
+
+    Raises
+    -------
+        KeyError
+            Raised when required fold or label columns are missing.
+    """
     fold_counts = fold_df["fold"].value_counts().sort_index()
     label_counts = (
         fold_df.groupby(["fold", "label"])
@@ -139,6 +211,7 @@ def _validate_fold_assignment(
     num_folds: int,
     grouped_by_patient: bool
 ) -> None:
+    """Validates fold assignment completeness, balance, class coverage, and patient leakage."""
     if (fold_df["fold"] < 0).any():
         raise RuntimeError("Fold assignment failed: some rows were unassigned")
 

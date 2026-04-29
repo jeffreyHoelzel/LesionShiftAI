@@ -1,3 +1,7 @@
+"""build_pyz.py
+
+Runs the process of building the `dist/lesionshiftai.pyz` script for HPC usage.
+"""
 import argparse
 import shutil
 import tempfile
@@ -8,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def _copytree(src: Path, dst: Path) -> None:
+    """Copies file tree from source to destination."""
     shutil.copytree(
         src,
         dst,
@@ -17,6 +22,14 @@ def _copytree(src: Path, dst: Path) -> None:
 
 
 def build_pyz(output: Path) -> None:
+    """
+    Runs the .pyz logic and orders script entry-points for easy HPC usage by CLI.
+
+    Parameters
+    ----------
+        output : Path
+            Where to write the `lesionshiftai.pyz` script to. Default is `dist/`.
+    """
     output = output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
 
@@ -51,6 +64,7 @@ def build_pyz(output: Path) -> None:
 
 
 def main() -> None:
+    """Main function to run .pyz builder."""
     p = argparse.ArgumentParser()
     p.add_argument("--output", default="dist/lesionshiftai.pyz", type=str)
     args = p.parse_args()

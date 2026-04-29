@@ -1,3 +1,7 @@
+"""evaluator.py
+
+Runs the HAM10000 external dataset testing step.
+"""
 from typing import Any, Dict, Optional, Tuple
 import numpy as np
 import pandas as pd
@@ -16,7 +20,36 @@ def evaluate_loader(
     dist_state: Optional[DistState] = None,
     threshold: float = 0.5
 ) -> Tuple[Dict[str, Any], pd.DataFrame]:
-    """Run model evaluation on a dataloader and return metrics + predictions."""
+    """
+    Evaluates a model on a DataLoader and returns metrics with prediction rows.
+
+    Parameters
+    ------------
+        model : torch.nn.Module
+            Model used to generate logits from input images.
+        loader : DataLoader
+            DataLoader containing evaluation batches.
+        criterion : torch.nn.Module
+            Loss function used to calculate evaluation loss.
+        device : torch.device
+            Device used for model inputs and labels.
+        dist_state : Optional[DistState]
+            Optional distributed state used to gather predictions across processes.
+        threshold : float
+            Probability cutoff used to convert predicted probabilities into binary labels.
+
+    Returns
+    --------
+        result : Tuple[Dict[str, Any], pd.DataFrame]
+            Evaluation metrics dictionary and prediction DataFrame.
+
+    Raises
+    -------
+        KeyError
+            Raised when evaluation batches are missing required fields.
+        RuntimeError
+            Raised when model evaluation, distributed gathering, or metric computation fails.
+    """
     model.eval()
 
     y_true = []
@@ -79,11 +112,11 @@ def evaluate_loader(
             "dataset": dataset_all,
             "label": y_true_np,
             "prob_malignant": y_prob_np,
-            "pred_label": (y_prob_np >= threshold).astype(int),
+            "pred_label": (y_prob_np >= threshold).astype(int)
         }
     )
 
-    # DistributedSampler can pad partitions; dedupe for final prediction/metric rows.
+    # DistributedSampler can pad partitions, dedupe for final prediction/metric rows
     preds = preds.drop_duplicates(
         subset=["dataset", "sample_id"], keep="first"
     ).reset_index(drop=True)
@@ -91,14 +124,34 @@ def evaluate_loader(
     y_true_final = preds["label"].to_numpy(dtype=int)
     y_prob_final = preds["prob_malignant"].to_numpy(dtype=float)
 
-    metrics = compute_binary_metrics(y_true_final, y_prob_final, threshold=threshold)
+    metrics = compute_binary_metrics(
+        y_true_final, y_prob_final, threshold=threshold)
     metrics["loss"] = loss_sum_all / max(n_all, 1)
 
     return metrics, preds
 
 
 def generalization_gap(val_metrics: Dict[str, Any], test_metrics: Dict[str, Any]) -> Dict[str, Any]:
-    """Compute validation-minus-test gap for core performance metrics."""
+    """
+    Computes validation-minus-test gaps for core binary classification metrics.
+
+    Parameters
+    ------------
+        val_metrics : Dict[str, Any]
+            Validation metrics dictionary.
+        test_metrics : Dict[str, Any]
+            Test metrics dictionary.
+
+    Returns
+    --------
+        gaps : Dict[str, Any]
+            Dictionary containing validation-minus-test metric gaps.
+
+    Raises
+    -------
+        TypeError
+            Raised when shared metric values cannot be converted to floats or subtracted.
+    """
     keys = ["accuracy", "precision", "recall", "f1", "roc_auc", "pr_auc"]
     return {
         f"{k}_gap_val_minus_test": float(val_metrics[k] - test_metrics[k])

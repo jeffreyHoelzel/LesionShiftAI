@@ -1,3 +1,8 @@
+"""metadata.py
+
+Loads ISIC 2019 and HAM10000 metadata CSV files for usage 
+during training and testing.
+"""
 from pathlib import Path
 import pandas as pd
 from lesionshiftai.data.labels import (
@@ -12,6 +17,30 @@ def load_isic_metadata(
     isic_root: str | Path,
     strict_images: bool = True
 ) -> pd.DataFrame:
+    """
+    Loads and validates ISIC metadata for binary lesion classification.
+
+    Parameters
+    ------------
+        isic_root : str | Path
+            Root directory containing the ISIC metadata CSV and image directory.
+        strict_images : bool
+            Whether to verify that every resolved image path exists on disk.
+
+    Returns
+    --------
+        out : pd.DataFrame
+            Standardized metadata DataFrame containing sample IDs, patient IDs, image paths, labels, source classes, and dataset name.
+
+    Raises
+    -------
+        ValueError
+            Raised when required metadata columns are missing or non-binary labels are found.
+        FileNotFoundError
+            Raised when strict image checking is enabled and one or more image files are missing.
+        OSError
+            Raised when the metadata CSV cannot be read.
+    """
     isic_root = Path(isic_root)
     csv_path = isic_root / "train-metadata.csv"
     image_dir = isic_root / "train images"
@@ -53,6 +82,30 @@ def load_isic_metadata(
 
 
 def load_ham_metadata(ham_root: str | Path, strict_images: bool = True) -> pd.DataFrame:
+    """
+    Loads and validates HAM10000 metadata for binary lesion classification.
+
+    Parameters
+    ------------
+        ham_root : str | Path
+            Root directory containing the HAM10000 ground truth CSV and image directory.
+        strict_images : bool
+            Whether to verify that every resolved image path exists on disk.
+
+    Returns
+    --------
+        out : pd.DataFrame
+            Standardized metadata DataFrame containing sample IDs, patient IDs, image paths, labels, source classes, and dataset name.
+
+    Raises
+    -------
+        ValueError
+            Raised when required metadata columns are missing or one-hot labels are invalid.
+        FileNotFoundError
+            Raised when strict image checking is enabled and one or more image files are missing.
+        OSError
+            Raised when the metadata CSV cannot be read.
+    """
     ham_root = Path(ham_root)
     csv_path = ham_root / "GroundTruth.csv"
     image_dir = ham_root / "images"
@@ -90,7 +143,7 @@ def load_ham_metadata(ham_root: str | Path, strict_images: bool = True) -> pd.Da
 
 
 def _assert_paths_exist(image_paths: pd.Series, dataset_name: str) -> None:
-    """Helper that verifies every image in Series actually exists given their path."""
+    """Verifies that all image paths in a Series exist on disk."""
     missing = [p for p in map(Path, image_paths) if not p.exists()]
     if missing:
         preview = ", ".join(str(p) for p in missing[:3])

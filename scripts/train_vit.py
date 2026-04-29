@@ -1,27 +1,38 @@
+"""train_vit.py
+
+Runs the ISIC 2019 ViT training, validation, and HAM10000 
+external testing logic. Makes use of DDP for multi-GPU 
+training and testing.
+"""
 import argparse
 import json
 import os
 from pathlib import Path
-
+from typing import List, Dict, Tuple, Any
 import torch
 import torch.distributed as dist
 from torch import nn
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
-
 from lesionshiftai.core.config import ExperimentConfig, load_config
 from lesionshiftai.core.distributed import barrier, cleanup_dist, setup_dist
 from lesionshiftai.core.reproducibility import set_seed
 from lesionshiftai.core.runtime import create_run_dir, write_json
 from lesionshiftai.eval.curves import write_binary_curve_artifacts
+from lesionshiftai.data.datamodule import build_data_bundle
+from lesionshiftai.eval.evaluator import evaluate_loader, generalization_gap
+from lesionshiftai.models.vit import ViTBinaryClassifier
+from lesionshiftai.train.engine import train_one_epoch
 
 
 def _unwrap_model(model: torch.nn.Module) -> torch.nn.Module:
+    """Returns the underlying model when wrapped in DistributedDataParallel."""
     return model.module if isinstance(model, DDP) else model
 
 
 def _pos_weight(train_df) -> torch.Tensor:
+    """Computes the positive class weight from the training labels."""
     counts = train_df["label"].value_counts().to_dict()
     neg = float(counts.get(0, 0))
     pos = float(counts.get(1, 1))
@@ -29,6 +40,7 @@ def _pos_weight(train_df) -> torch.Tensor:
 
 
 def _build_scheduler(optimizer: AdamW, cfg: ExperimentConfig):
+    """Builds the learning rate scheduler with optional warmup and cosine annealing."""
     cosine_epochs = max(cfg.train.epochs - cfg.train.warmup_epochs, 1)
     cosine = CosineAnnealingLR(
         optimizer,
@@ -38,7 +50,7 @@ def _build_scheduler(optimizer: AdamW, cfg: ExperimentConfig):
     if cfg.train.warmup_epochs == 0:
         return cosine
 
-    # Warm up linearly from a lower starting LR for stable ViT fine-tuning.
+    # warm up linearly from a lower starting LR for stable ViT fine-tuning
     warmup = LinearLR(
         optimizer,
         start_factor=1.0 / float(cfg.train.warmup_epochs + 1),
@@ -53,6 +65,7 @@ def _build_scheduler(optimizer: AdamW, cfg: ExperimentConfig):
 
 
 def _infer_run_dir_from_checkpoint(checkpoint_path: Path) -> Path:
+    """Infers the run directory from a checkpoint path."""
     if checkpoint_path.parent.name == "checkpoints":
         return checkpoint_path.parent.parent
     return checkpoint_path.parent
@@ -64,7 +77,8 @@ def _resolve_run_dir(
     resume: str | None,
     is_main: bool,
     dist_enabled: bool
-) -> tuple[Path, Path | None]:
+) -> Tuple[Path, Path | None]:
+    """Creates or resolves the run directory and optional resume checkpoint path."""
     run_dir: Path | None = None
     resume_path: Path | None = None
 
@@ -93,7 +107,8 @@ def _resolve_run_dir(
     return resolved_run_dir, resolved_resume
 
 
-def _load_existing_history(history_path: Path) -> list[dict]:
+def _load_existing_history(history_path: Path) -> List[Dict[Any, Any]]:
+    """Loads existing training history from disk."""
     if not history_path.exists():
         return []
     payload = json.loads(history_path.read_text(encoding="utf-8"))
@@ -106,10 +121,11 @@ def _build_checkpoint_payload(
     optimizer: AdamW,
     scheduler,
     epoch: int,
-    val_metrics: dict,
+    val_metrics: Dict[str, Any],
     best_pr_auc: float,
     resumed_from: str | None
-) -> dict:
+) -> Dict[str, Any]:
+    """Builds a checkpoint payload for saving ViT training state."""
     return {
         "epoch": int(epoch),
         "model_state_dict": _unwrap_model(model).state_dict(),
@@ -122,6 +138,10 @@ def _build_checkpoint_payload(
 
 
 def main() -> None:
+    """
+    Runs ViT training, optional checkpoint resumption, evaluation, 
+    and metric artifact generation.
+    """
     p = argparse.ArgumentParser()
     p.add_argument("--config", default="config/vit_b16.yml", type=str)
     p.add_argument("--threshold", default=0.5, type=float)
@@ -132,11 +152,6 @@ def main() -> None:
         help="Optional checkpoint path to resume ViT training."
     )
     args = p.parse_args()
-
-    from lesionshiftai.data.datamodule import build_data_bundle
-    from lesionshiftai.eval.evaluator import evaluate_loader, generalization_gap
-    from lesionshiftai.models.vit import ViTBinaryClassifier
-    from lesionshiftai.train.engine import train_one_epoch
 
     cfg = load_config(args.config)
     process_rank = int(os.environ.get("RANK", "0"))
@@ -201,7 +216,8 @@ def main() -> None:
 
         history = []
         if dist_state.is_main:
-            history = _load_existing_history(run_dir / "metrics" / "history.json")
+            history = _load_existing_history(
+                run_dir / "metrics" / "history.json")
 
         for epoch in range(start_epoch, cfg.train.epochs + 1):
             if bundle.train_sampler is not None:
@@ -250,7 +266,8 @@ def main() -> None:
                 if best_pr_auc == float("-inf") or val_metrics["pr_auc"] > best_pr_auc:
                     best_pr_auc = float(val_metrics["pr_auc"])
                     ckpt_payload["best_pr_auc"] = best_pr_auc
-                    torch.save(ckpt_payload, run_dir / "checkpoints" / "best.pt")
+                    torch.save(ckpt_payload, run_dir /
+                               "checkpoints" / "best.pt")
                     val_preds.to_csv(
                         run_dir / "predictions" / "val_best.csv",
                         index=False
@@ -291,8 +308,10 @@ def main() -> None:
         gap = generalization_gap(val_metrics, test_metrics)
 
         if dist_state.is_main:
-            val_preds.to_csv(run_dir / "predictions" / "val_final.csv", index=False)
-            test_preds.to_csv(run_dir / "predictions" / "ham_test.csv", index=False)
+            val_preds.to_csv(run_dir / "predictions" /
+                             "val_final.csv", index=False)
+            test_preds.to_csv(run_dir / "predictions" /
+                              "ham_test.csv", index=False)
             curves_dir = run_dir / "metrics" / "curves"
             write_binary_curve_artifacts(
                 y_true=val_preds["label"].to_numpy(dtype=int),
@@ -300,7 +319,7 @@ def main() -> None:
                 output_dir=curves_dir,
                 split_name="val_final",
                 model_scope="vit",
-                extra_metadata={"threshold": float(args.threshold)},
+                extra_metadata={"threshold": float(args.threshold)}
             )
             write_binary_curve_artifacts(
                 y_true=test_preds["label"].to_numpy(dtype=int),
@@ -308,10 +327,11 @@ def main() -> None:
                 output_dir=curves_dir,
                 split_name="ham_test",
                 model_scope="vit",
-                extra_metadata={"threshold": float(args.threshold)},
+                extra_metadata={"threshold": float(args.threshold)}
             )
 
-            write_json(run_dir / "metrics" / "history.json", {"epochs": history})
+            write_json(run_dir / "metrics" /
+                       "history.json", {"epochs": history})
             write_json(run_dir / "metrics" / "val_metrics.json", val_metrics)
             write_json(run_dir / "metrics" / "test_metrics.json", test_metrics)
             write_json(run_dir / "metrics" / "generalization_gap.json", gap)

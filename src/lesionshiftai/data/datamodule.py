@@ -1,5 +1,9 @@
+"""datamodule.py
+
+Handles bundling and runtime storage of all data used by LesionShiftAI.
+"""
 from dataclasses import dataclass
-from typing import Dict
+from typing import Dict, Tuple
 import pandas as pd
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
@@ -13,6 +17,40 @@ from lesionshiftai.data.transforms import build_eval_transform, build_train_tran
 
 @dataclass(slots=True)
 class DataBundle:
+    """
+    Stores standard train, validation, and test data objects.
+
+    Parameters
+    ------------
+        train_loader : DataLoader
+            DataLoader for the training split.
+        val_loader : DataLoader
+            DataLoader for the validation split.
+        test_loader : DataLoader
+            DataLoader for the test split.
+        train_df : pd.DataFrame
+            Metadata DataFrame for the training split.
+        val_df : pd.DataFrame
+            Metadata DataFrame for the validation split.
+        test_df : pd.DataFrame
+            Metadata DataFrame for the test split.
+        train_sampler : DistributedSampler | None
+            Optional distributed sampler for the training split.
+        val_sampler : DistributedSampler | None
+            Optional distributed sampler for the validation split.
+        test_sampler : DistributedSampler | None
+            Optional distributed sampler for the test split.
+
+    Returns
+    --------
+        DataBundle : DataBundle
+            Dataclass instance containing loaders, metadata, and samplers.
+
+    Raises
+    -------
+        TypeError
+            Raised when required fields are missing or incompatible values are provided.
+    """
     train_loader: DataLoader
     val_loader: DataLoader
     test_loader: DataLoader
@@ -26,6 +64,36 @@ class DataBundle:
 
 @dataclass(slots=True)
 class IsicFoldDataBundle:
+    """
+    Stores ISIC fold train and validation data objects.
+
+    Parameters
+    ------------
+        train_loader : DataLoader
+            DataLoader for the fold training split.
+        val_loader : DataLoader
+            DataLoader for the fold validation split.
+        train_df : pd.DataFrame
+            Metadata DataFrame for the fold training split.
+        val_df : pd.DataFrame
+            Metadata DataFrame for the fold validation split.
+        fold_assignment_df : pd.DataFrame
+            DataFrame containing fold assignments for the full ISIC dataset.
+        train_sampler : DistributedSampler | None
+            Optional distributed sampler for the fold training split.
+        val_sampler : DistributedSampler | None
+            Optional distributed sampler for the fold validation split.
+
+    Returns
+    --------
+        IsicFoldDataBundle : IsicFoldDataBundle
+            Dataclass instance containing fold loaders, metadata, and samplers.
+
+    Raises
+    -------
+        TypeError
+            Raised when required fields are missing or incompatible values are provided.
+    """
     train_loader: DataLoader
     val_loader: DataLoader
     train_df: pd.DataFrame
@@ -40,6 +108,32 @@ def build_data_bundle(
     world_size: int = 1,
     rank: int = 0
 ) -> DataBundle:
+    """
+    Builds train, validation, and test DataLoaders from configured ISIC and HAM data.
+
+    Parameters
+    ------------
+        cfg : ExperimentConfig
+            Experiment configuration containing dataset paths, loader settings, and seed values.
+        world_size : int
+            Total number of distributed processes.
+        rank : int
+            Global process rank.
+
+    Returns
+    --------
+        bundle : DataBundle
+            Data bundle containing DataLoaders, split metadata, and optional distributed samplers.
+
+    Raises
+    -------
+        FileNotFoundError
+            Raised when configured dataset paths or metadata files cannot be found.
+        ValueError
+            Raised when metadata labels or split configuration values are invalid.
+        RuntimeError
+            Raised when DataLoader or dataset construction fails.
+    """
     isic_df = load_isic_metadata(cfg.data.isic_root)
     ham_df = load_ham_metadata(cfg.data.ham_root)
 
@@ -102,6 +196,36 @@ def build_isic_fold_data_bundle(
     world_size: int = 1,
     rank: int = 0
 ) -> IsicFoldDataBundle:
+    """
+    Builds train and validation DataLoaders for one ISIC ensemble fold.
+
+    Parameters
+    ------------
+        cfg : ExperimentConfig
+            Experiment configuration containing dataset paths, loader settings, and seed values.
+        num_folds : int
+            Number of folds used to partition the ISIC dataset.
+        fold_index : int
+            Index of the fold to use for the current ensemble member.
+        world_size : int
+            Total number of distributed processes.
+        rank : int
+            Global process rank.
+
+    Returns
+    --------
+        bundle : IsicFoldDataBundle
+            Fold data bundle containing DataLoaders, split metadata, fold assignments, and optional distributed samplers.
+
+    Raises
+    -------
+        ValueError
+            Raised when fold_index is outside the valid fold range.
+        RuntimeError
+            Raised when the selected fold has no assigned rows.
+        FileNotFoundError
+            Raised when configured dataset paths or metadata files cannot be found.
+    """
     if fold_index < 0 or fold_index >= num_folds:
         raise ValueError("`fold_index` must be between 0 and num_folds - 1")
 
@@ -149,11 +273,30 @@ def build_isic_fold_data_bundle(
 
 
 def binary_counts(df: pd.DataFrame) -> Dict[int, int]:
+    """
+    Counts binary labels in a metadata DataFrame.
+
+    Parameters
+    ------------
+        df : pd.DataFrame
+            DataFrame containing a label column.
+
+    Returns
+    --------
+        counts : Dict[int, int]
+            Dictionary mapping each binary label to its count.
+
+    Raises
+    -------
+        KeyError
+            Raised when the DataFrame does not contain a label column.
+    """
     counts = df["label"].value_counts().sort_index()
     return {int(k): int(v) for k, v in counts.items()}
 
 
 def _common_loader_args(cfg: ExperimentConfig) -> Dict[str, object]:
+    """Builds common keyword arguments shared by project DataLoaders."""
     return {
         "batch_size": cfg.data.batch_size,
         "num_workers": cfg.data.num_workers,
@@ -170,12 +313,13 @@ def _build_train_val_loaders(
     world_size: int,
     rank: int,
     seed_base: int
-) -> tuple[
+) -> Tuple[
     DataLoader,
     DataLoader,
     DistributedSampler | None,
     DistributedSampler | None
 ]:
+    """Builds train and validation DataLoaders with optional distributed samplers."""
     common_loader_args = _common_loader_args(cfg)
 
     # handle multiple GPUs for training and validation

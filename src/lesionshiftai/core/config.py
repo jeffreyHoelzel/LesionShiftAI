@@ -1,3 +1,8 @@
+"""config.py
+
+Core configuration of types used throughout model 
+training, validation, and testing.
+"""
 import getpass
 import os
 from dataclasses import dataclass
@@ -7,6 +12,36 @@ import yaml
 
 @dataclass(slots=True)
 class DataConfig:
+    """
+    Stores dataset and DataLoader configuration values.
+
+    Parameters
+    ------------
+        isic_root : Path
+            Root directory for the ISIC dataset.
+        ham_root : Path
+            Root directory for the HAM dataset.
+        image_size : int
+            Target image size used during preprocessing.
+        val_size : float
+            Fraction of data reserved for validation.
+        batch_size : int
+            Number of samples loaded per batch.
+        num_workers : int
+            Number of worker processes used by each DataLoader.
+        pin_memory : bool
+            Whether DataLoader should pin memory for faster GPU transfer.
+
+    Returns
+    --------
+        DataConfig : DataConfig
+            Dataclass instance containing data configuration values.
+
+    Raises
+    -------
+        TypeError
+            Raised when required fields are missing or incompatible values are provided.
+    """
     isic_root: Path
     ham_root: Path
     image_size: int = 224
@@ -18,6 +53,32 @@ class DataConfig:
 
 @dataclass(slots=True)
 class TrainConfig:
+    """
+    Stores training hyperparameter configuration values.
+
+    Parameters
+    ------------
+        epochs : int
+            Number of training epochs.
+        lr : float
+            Initial learning rate.
+        weight_decay : float
+            Weight decay used by the optimizer.
+        warmup_epochs : int
+            Number of warmup epochs before the main learning rate schedule.
+        min_lr : float
+            Minimum learning rate used during scheduling.
+
+    Returns
+    --------
+        TrainConfig : TrainConfig
+            Dataclass instance containing training configuration values.
+
+    Raises
+    -------
+        TypeError
+            Raised when incompatible values are provided.
+    """
     epochs: int = 20
     lr: float = 3e-4
     weight_decay: float = 1e-4
@@ -27,6 +88,34 @@ class TrainConfig:
 
 @dataclass(slots=True)
 class ExperimentConfig:
+    """
+    Stores the full experiment configuration.
+
+    Parameters
+    ------------
+        name : str
+            Name of the experiment.
+        output_root : Path
+            Root directory where experiment outputs are saved.
+        seed : int
+            Random seed used for reproducibility.
+        deterministic : bool
+            Whether deterministic training behavior should be enabled.
+        data : DataConfig
+            Dataset and DataLoader configuration.
+        train : TrainConfig
+            Training hyperparameter configuration.
+
+    Returns
+    --------
+        ExperimentConfig : ExperimentConfig
+            Dataclass instance containing the full experiment configuration.
+
+    Raises
+    -------
+        TypeError
+            Raised when required fields are missing or incompatible values are provided.
+    """
     name: str
     output_root: Path
     seed: int
@@ -36,6 +125,7 @@ class ExperimentConfig:
 
 
 def _expand_path(raw_path: str | Path) -> Path:
+    """Expands user and environment variables in a filesystem path."""
     raw = str(raw_path)
     user = (
         os.environ.get("USER")
@@ -53,7 +143,30 @@ def _expand_path(raw_path: str | Path) -> Path:
 
 
 def load_config(path: str | Path) -> ExperimentConfig:
-    """Experiment configuration API for loading and validating YML file."""
+    """
+    Loads and validates an experiment configuration from a YAML file.
+
+    Parameters
+    ------------
+        path : str | Path
+            Path to the YAML configuration file.
+
+    Returns
+    --------
+        cfg : ExperimentConfig
+            Validated experiment configuration object.
+
+    Raises
+    -------
+        KeyError
+            Raised when required configuration keys are missing.
+        ValueError
+            Raised when configuration values fail validation.
+        OSError
+            Raised when the configuration file cannot be read.
+        yaml.YAMLError
+            Raised when the YAML file cannot be parsed.
+    """
     config_path = Path(path)
     raw = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
 
@@ -87,7 +200,7 @@ def load_config(path: str | Path) -> ExperimentConfig:
 
 
 def _val_config(cfg: ExperimentConfig) -> None:
-    """Helper to validate ExperimentConfig object was populated correctly."""
+    """Validates an ExperimentConfig object."""
     if not 0.0 < cfg.data.val_size < 0.5:
         raise ValueError("data.val_size must be between 0 and 0.5")
     if cfg.data.batch_size < 1:

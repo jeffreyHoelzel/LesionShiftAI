@@ -1,3 +1,7 @@
+"""engine.py
+
+Main training engine for all three models.
+"""
 from typing import Any, Dict, Optional
 import numpy as np
 import torch
@@ -15,7 +19,38 @@ def train_one_epoch(
     dist_state: Optional[DistState] = None,
     threshold: float = 0.5
 ) -> Dict[str, Any]:
-    """Train for one epoch and return aggregate training metrics."""
+    """
+    Trains a model for one epoch and returns aggregate binary classification metrics.
+
+    Parameters
+    ------------
+        model : torch.nn.Module
+            Model being trained.
+        loader : DataLoader
+            DataLoader containing training batches.
+        optimizer : torch.optim.Optimizer
+            Optimizer used to update model parameters.
+        criterion : torch.nn.Module
+            Loss function used to calculate training loss.
+        device : torch.device
+            Device used for model inputs and labels.
+        dist_state : Optional[DistState]
+            Optional distributed state used to gather training metrics across processes.
+        threshold : float
+            Probability cutoff used to convert predicted probabilities into binary labels.
+
+    Returns
+    --------
+        metrics : Dict[str, Any]
+            Dictionary containing aggregate training loss and binary classification metrics.
+
+    Raises
+    -------
+        KeyError
+            Raised when training batches are missing required fields.
+        RuntimeError
+            Raised when forward propagation, backpropagation, optimization, distributed gathering, or metric computation fails.
+    """
     model.train()
 
     y_true = []
