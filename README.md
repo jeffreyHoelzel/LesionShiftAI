@@ -1,125 +1,251 @@
 # LesionShiftAI
 
-LesionShiftAI is a deep learning benchmark for cross-dataset skin lesion classification. The project evaluates how well different model families generalize when trained on one dermoscopic dataset and tested on another under real-world dataset shift.
+LesionShiftAI is a research benchmark for cross-dataset skin lesion classification under dataset shift. The project trains models on ISIC 2019 and evaluates external generalization on HAM10000.
 
-The core experimental setting is:
-
-- Train on ISIC 2019
-- Test on HAM10000
-- Compare CNN, CNN ensemble, and Vision Transformer approaches
-
-## Project Goal
-
-Most skin lesion classifiers are trained and evaluated on the same dataset, which can overestimate real-world performance. LesionShiftAI focuses on external generalization by measuring how well models transfer across datasets collected under different institutions, imaging conditions, and label distributions.
-
-## Planned Model Benchmarks
+The repository currently supports three training/evaluation pipelines:
 
 - Baseline CNN
-- CNN Ensemble
-- Vision Transformer
+- Ensemble of CNNs (k-fold members + aggregate predictions)
+- Vision Transformer (ViT-B16)
 
-## Core Questions
+Each training script performs:
 
-- How much does performance drop under dataset shift?
-- Do ensembles improve robustness over a single CNN?
-- Can a ViT remain competitive under limited medical imaging data?
-- Which metrics matter most for clinically meaningful screening?
+1. ISIC training
+2. ISIC validation
+3. HAM10000 external test
+4. Artifact export (checkpoints, predictions, metrics, ROC/PR curves, generalization gap)
 
-## Repository Structure
+## Repository Layout
 
 ```text
 LesionShiftAI/
-├── config/        # experiment and model config files
-├── docs/          # project website, reports, and supporting docs
-├── notebooks/     # exploratory analysis and debugging notebooks
-├── scripts/       # scripts for training, evaluation, and utilities
-├── src/           # source code
-│   └── lesionshiftai/
-│       ├── data/      # dataset loading, preprocessing, and label mapping
-│       ├── models/    # CNN, ensemble, and ViT model definitions
-│       ├── train/     # training loops and optimization logic
-│       ├── eval/      # metrics and cross dataset evaluation
-│       └── visuals/   # plots, confusion matrices, ROC and PR curves
-├── tests/         # unit and integration tests
-├── pyproject.toml
-└── environment.yml
+|- config/                 # baseline_cnn.yml and vit_b16.yml
+|- scripts/
+|  |- hpc/                 # SLURM launch scripts for Monsoon
+|  |- train_baseline_cnn.py
+|  |- train_ensemble_member_cnn.py
+|  |- train_vit.py
+|- src/lesionshiftai/      # core, data, models, train, eval modules
+|- tests/                  # unit and integration tests
+|- .github/workflows/ci.yml
+|- pyproject.toml
+|- environment.yml
+`- dist/lesionshiftai.pyz  # zipapp launcher used on HPC
 ```
 
-## Datasets
-### Training
+## Dataset Expectations
 
-#### ISIC 2019
-Used as the primary training dataset. Multi class lesion labels are mapped to a binary target of benign vs malignant.
+LesionShiftAI expects these files/directories:
 
-### External Testing
+```text
+ISIC 2019/
+|- train-metadata.csv
+`- train images/
+   `- <isic_id>.jpg
 
-#### HAM10000
-Used as the external test dataset to evaluate generalization under dataset shift.
+HAM10000/
+|- GroundTruth.csv
+`- images/
+   `- <image>.jpg
+```
 
-## Evaluation Focus
+## Environment Setup
 
-This project emphasizes metrics that are more informative than raw accuracy for imbalanced medical classification tasks.
+### Local Development with uv
 
-Primary metrics include:
-
-- ROC AUC
-- PR AUC
-- Recall
-- Precision
-- F1 score
-- Confusion matrix
-
-Recall is especially important because missing a malignant lesion is much more costly than producing a false positive.
-
-## Installation
-
-### Conda environment
+Use Python 3.12 locally.
 
 ```bash
-conda env create -f environment.yml
-conda activate lesionshiftai
+uv sync --extra dev --python 3.12
 ```
 
-### Editable install
+Run commands without activating the virtual environment:
+
 ```bash
-pip install -e .
+uv run python --version
+uv run pytest -m unit --no-cov
 ```
 
-## Reproducibility
+### Monsoon HPC with Conda
 
-This repository is being structured to support reproducible experiments through:
+Create a shared environment in scratch (recommended path matches SLURM scripts):
 
-- version controlled configurations
-- consistent label mapping across datasets
-- patient-aware splitting where metadata allows
-- tracked experiment outputs and evaluation artifacts
+```bash
+module purge
+module load anaconda3
+source "$(conda info --base)/etc/profile.d/conda.sh"
+conda env create -f environment.yml -p /scratch/$USER/conda/envs/lesionshiftai
+conda activate /scratch/$USER/conda/envs/lesionshiftai
+```
 
-## Ethical Considerations
+If the environment already exists:
 
-This project is for research and benchmarking purposes only. It is not a clinical diagnostic tool.
+```bash
+conda env update -f environment.yml -p /scratch/$USER/conda/envs/lesionshiftai --prune
+```
 
-Important concerns include:
+## HPC Runtime Preparation (Monsoon)
 
-- false negatives in malignant lesion detection
-- dataset bias across patient populations and skin tones
-- reduced reliability under real world domain shift
+The SLURM scripts in `scripts/hpc` invoke `lesionshiftai.pyz` and config files by filename only, so stage them in your working directory before submitting jobs:
 
-## Current Status
+```bash
+uv run python scripts/build_pyz.py
+scp dist/lesionshiftai.pyz <USER>@monsoon.hpc.nau.edu:~/lesionshiftai
+scp config/baseline_cnn.yml <USER>@monsoon.hpc.nau.edu:~/lesionshiftai
+scp config/vit_b16.yml <USER>@monsoon.hpc.nau.edu:~/lesionshiftai
+scp scripts/hpc/train_baseline_cnn.sh <USER>@monsoon.hpc.nau.edu:~/lesionshiftai
+scp scripts/hpc/train_ensemble_cnn.sh <USER>@monsoon.hpc.nau.edu:~/lesionshiftai
+scp scripts/hpc/train_vit.sh <USER>@monsoon.hpc.nau.edu:~/lesionshiftai
+ssh <USER>@monsoon.hpc.nau.edu # make sure you are connected to NAU VPN if not on campus
+cd lesionshiftai
+dos2unix *.sh # convert to Linux format if coming from Windows machine
+chmod +x *.sh
+```
 
-Early repository setup and infrastructure development.
+## Configure Experiments
 
-Implementation docs for recently added pipeline code:
+Edit the staged `baseline_cnn.yml` and `vit_b16.yml` before launching jobs.
 
-- `docs/recent-code-documentation.md`
+Required fields to set:
 
-Planned next steps:
+- `experiment_name`: unique name for each run family
+- `output_root`: recommended `/scratch/$USER/lesionshiftai/outputs`
+- `data.isic_root`: absolute path to ISIC 2019 root
+- `data.ham_root`: absolute path to HAM10000 root
 
-- data ingestion and binary label mapping
-- baseline CNN training pipeline
-- ensemble benchmarking
-- ViT benchmarking
-- cross dataset evaluation and analysis
+Common tuning fields:
+
+- `data.batch_size`, `data.num_workers`, `data.image_size`
+- `train.epochs`, `train.lr`, `train.weight_decay`
+- ViT only: `train.warmup_epochs`, `train.min_lr`
+
+## Train and Evaluate on HPC
+
+All commands below should be run from the directory that contains:
+
+- `lesionshiftai.pyz`
+- `baseline_cnn.yml`
+- `vit_b16.yml`
+- `scripts/hpc/`
+
+### Baseline CNN
+
+```bash
+sbatch train_baseline_cnn.sh
+```
+
+Primary artifacts:
+
+- `checkpoints/best.pt`
+- `predictions/val_final.csv`
+- `predictions/ham_test.csv`
+- `metrics/val_metrics.json`
+- `metrics/test_metrics.json`
+- `metrics/generalization_gap.json`
+
+### Ensemble of CNNs
+
+`ENSEMBLE_RUN_ID` is required and must be shared across fold jobs.
+
+Run all folds in one job:
+
+```bash
+export ENSEMBLE_RUN_ID=ens_$(date +%Y%m%d_%H%M%S)
+sbatch train_ensemble_cnn.sh
+```
+
+Run a single fold (for retry/debug):
+
+```bash
+export ENSEMBLE_RUN_ID=ens_20260429_rerun
+FOLD_INDEX=0 sbatch train_ensemble_cnn.sh
+```
+
+Optional fold count override:
+
+```bash
+ENSEMBLE_NUM_FOLDS=5 sbatch train_ensemble_cnn.sh
+```
+
+Primary artifacts:
+
+- `members/fold_<k>/...` for each member
+- `ensemble/predictions/isic_val_aggregate_predictions.csv`
+- `ensemble/predictions/ham_test_aggregate_predictions.csv`
+- `ensemble/metrics/isic_val_aggregate_metrics.json`
+- `ensemble/metrics/ham_test_aggregate_metrics.json`
+- `ensemble/metrics/generalization_gap.json`
+
+### Vision Transformer (ViT-B16)
+
+```bash
+sbatch train_vit.sh
+```
+
+Primary artifacts:
+
+- `checkpoints/best.pt`
+- `checkpoints/last.pt`
+- `predictions/val_final.csv`
+- `predictions/ham_test.csv`
+- `metrics/val_metrics.json`
+- `metrics/test_metrics.json`
+- `metrics/generalization_gap.json`
+
+## Optional Local Training Commands
+
+For local smoke runs (single process):
+
+```bash
+uv run python scripts/train_baseline_cnn.py --config config/baseline_cnn.yml --threshold 0.5
+uv run python scripts/train_ensemble_member_cnn.py --config config/baseline_cnn.yml --num-folds 5 --ensemble-run-id local_smoke --threshold 0.5
+uv run python scripts/train_vit.py --config config/vit_b16.yml --threshold 0.5
+```
+
+## Testing and Code Correctness
+
+### Local Test Commands
+
+Fast feedback:
+
+```bash
+uv run pytest -m unit --no-cov
+```
+
+Pipeline smoke tests:
+
+```bash
+uv run pytest -m integration --no-cov
+```
+
+Full validation with coverage gate:
+
+```bash
+uv run pytest
+```
+
+The project enforces `--cov-fail-under=85` through `pyproject.toml`.
+
+### CI Pipeline
+
+GitHub Actions workflow: `.github/workflows/ci.yml`
+
+The CI job runs on:
+
+- Pull requests targeting `main`
+- Manual trigger (`workflow_dispatch`)
+
+CI steps:
+
+1. Install package + test dependencies
+2. Run unit tests (`pytest -m unit --no-cov`)
+3. Run integration tests (`pytest -m integration --no-cov`)
+4. Run full suite with coverage gate (`pytest`)
 
 ## Author
 
 Jeffrey Hoelzel Jr.
+
+## Disclaimer
+
+**LesionShiftAI is a research benchmarking project and is not a clinical diagnostic tool.**
