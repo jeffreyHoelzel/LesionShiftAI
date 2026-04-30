@@ -47,8 +47,6 @@ def build_pyz(output: Path) -> None:
                      stage / "train_baseline_cnn.py")
         shutil.copy2(ROOT / "scripts" / "train_vit.py",
                      stage / "train_vit.py")
-        shutil.copy2(ROOT / "scripts" / "smoke_data_pipeline.py",
-                     stage / "smoke_data_pipeline.py")
 
         # zipapp entrypoint
         shutil.copy2(ROOT / "run" / "__main__.py", stage / "__main__.py")
