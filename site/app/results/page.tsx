@@ -12,7 +12,7 @@ export default function ResultsPage() {
         <h1>Pinned Benchmark Snapshot</h1>
         <p className="hero-copy">
           This page hard-codes the v1 benchmark snapshot from pinned experiment
-          runs. Update the typed data module when new runs are promoted.
+          runs. This page gets updated when new runs outperform old runs.
         </p>
       </section>
 
@@ -22,7 +22,7 @@ export default function ResultsPage() {
             <article key={model.id} className="info-card reveal">
               <h3>{model.label}</h3>
               <p>
-                <strong>Run ID:</strong> <code>{model.runId}</code>
+                <strong>Run ID:</strong> <code className="run-id">{model.runId}</code>
               </p>
               <p>{model.notes}</p>
             </article>

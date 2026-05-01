@@ -56,10 +56,17 @@ export default function MethodsPage() {
             </p>
           </article>
           <article className="info-card reveal">
-            <h3>Vision Transformer</h3>
+            <h3>Vision Transformer (ViT-B16)</h3>
             <p>
               ViT-B16 initialized from pretrained weights with warmup and
               minimum-learning-rate control for stable fine-tuning.
+            </p>
+          </article>
+          <article className="info-card reveal">
+            <h3>Vision Transformer (ViT-L16)</h3>
+            <p>
+              ViT-L16 initialized from pretrained weights
+              to test higher-capacity transfer under the same protocol.
             </p>
           </article>
         </div>

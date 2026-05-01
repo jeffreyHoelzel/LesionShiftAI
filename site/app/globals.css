@@ -265,11 +265,14 @@ p {
   padding: 0.92rem;
   display: grid;
   gap: 0.5rem;
+  min-width: 0;
 }
 
 .info-card p,
 .stat-card p {
   color: #bdd0ef;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .stat-label {
@@ -395,6 +398,14 @@ code {
   color: #d6e9ff;
   padding: 0.08rem 0.28rem;
   border-radius: 4px;
+}
+
+.run-id {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  vertical-align: top;
 }
 
 .site-footer {

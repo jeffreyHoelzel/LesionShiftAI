@@ -1,64 +1,137 @@
 import SectionBlock from "@/components/section-block";
 
-const snippetTrainLoop = `for epoch in range(start_epoch, cfg.train.epochs + 1):
+const snippetCnnDefinition = `class BaselineCNN(nn.Module):
+    def __init__(self, pretrained: bool = True) -> None:
+        super().__init__()
+        weights = ResNet50_Weights.IMAGENET1K_V2 if pretrained else None
+        self.backbone = resnet50(weights=weights)
+        in_features = self.backbone.fc.in_features
+        # single logit for BCE
+        self.backbone.fc = nn.Linear(in_features, 1)
+
+    def forward(self, x: torch.Tensor):
+        return self.backbone(x).squeeze(1)`;
+
+const snippetVitDefinition = `class ViTBinaryClassifier(nn.Module):
+    def __init__(
+        self,
+        model_name: str = "vit_base_patch16_224",
+        pretrained: bool = True
+    ) -> None:
+        super().__init__()
+        self.backbone = timm.create_model(
+            model_name,
+            pretrained=pretrained,
+            num_classes=1
+        )
+
+    def forward(self, x: torch.Tensor):
+        return self.backbone(x).squeeze(-1)`;
+
+const snippetModelSelection = `# baseline and ensemble members
+model = BaselineCNN(pretrained=True).to(device)
+
+# ViT experiment variant
+model = ViTBinaryClassifier(
+    model_name="vit_large_patch16_224.augreg_in21k_ft_in1k",
+    pretrained=True
+).to(device)`;
+
+const snippetTrainLoop = `optimizer = AdamW(
+    model.parameters(),
+    lr=cfg.train.lr,
+    weight_decay=cfg.train.weight_decay
+)
+scheduler = _build_scheduler(optimizer, cfg)
+
+for epoch in range(start_epoch, cfg.train.epochs + 1):
     train_metrics = train_one_epoch(...)
     val_metrics, val_preds = evaluate_loader(...)
+    scheduler.step()
+
+    ckpt_payload = _build_checkpoint_payload(...)
+    torch.save(ckpt_payload, run_dir / "checkpoints" / "last.pt")
 
     if best_pr_auc == float("-inf") or val_metrics["pr_auc"] > best_pr_auc:
         best_pr_auc = float(val_metrics["pr_auc"])
         torch.save(ckpt_payload, run_dir / "checkpoints" / "best.pt")`;
 
-const snippetEval = `metrics = compute_binary_metrics(y_true_final, y_prob_final, threshold=threshold)
-metrics["loss"] = loss_sum_all / max(n_all, 1)
-
-return metrics, preds`;
-
-const snippetGap = `keys = ["accuracy", "precision", "recall", "f1", "roc_auc", "pr_auc"]
-return {
-    f"{k}_gap_val_minus_test": float(val_metrics[k] - test_metrics[k])
-    for k in keys
-    if k in val_metrics and k in test_metrics
-}`;
+const snippetEnsembleAggregation = `test_aggregate_df = (
+    all_test_preds_df
+    .groupby(["dataset", "sample_id"], as_index=False)
+    .agg(
+        label=("label", "first"),
+        prob_malignant=("prob_malignant", "mean"),
+        prob_malignant_std=("prob_malignant", "std"),
+        member_predictions=("member_fold", "nunique")
+    )
+)`;
 
 export default function CodePage() {
   return (
     <>
       <section className="subhero reveal">
         <p className="hero-eyebrow">Code</p>
-        <h1>Focused Implementation Snippets</h1>
+        <h1>Model Definitions and Core Snippets</h1>
         <p className="hero-copy">
-          The benchmark codebase emphasizes deterministic runs, explicit metrics
-          export, and external-shift analysis in each pipeline.
+          This page highlights the concrete model classes and the key places
+          where they are instantiated and aggregated in benchmark runs.
         </p>
       </section>
 
-      <SectionBlock eyebrow="Training" title="Epoch Loop and Model Selection">
+      <SectionBlock eyebrow="Models" title="Baseline / Ensemble CNN Definition">
         <p className="plain-copy reveal">
-          Each training script evaluates every epoch and tracks the best model
-          by validation PR AUC before writing final split-level artifacts.
+          Source: <code>src/lesionshiftai/models/cnn.py</code>. Baseline and
+          each ensemble member use the same ResNet50 backbone with a 1-logit
+          classification head.
+        </p>
+        <pre className="code-block reveal">
+          <code>{snippetCnnDefinition}</code>
+        </pre>
+      </SectionBlock>
+
+      <SectionBlock eyebrow="Models" title="Vision Transformer Definition">
+        <p className="plain-copy reveal">
+          Source: <code>src/lesionshiftai/models/vit.py</code>. The ViT wrapper
+          is architecture-agnostic via <code>model_name</code> and always
+          outputs a single binary logit.
+        </p>
+        <pre className="code-block reveal">
+          <code>{snippetVitDefinition}</code>
+        </pre>
+      </SectionBlock>
+
+      <SectionBlock eyebrow="Training" title="Where Model Variants Are Selected">
+        <p className="plain-copy reveal">
+          Source: <code>scripts/train_baseline_cnn.py</code>,{" "}
+          <code>scripts/train_ensemble_member_cnn.py</code>, and{" "}
+          <code>scripts/train_vit.py</code>. This is where run scripts pick CNN
+          vs ViT backbones and specific pretrained ViT variants.
+        </p>
+        <pre className="code-block reveal">
+          <code>{snippetModelSelection}</code>
+        </pre>
+      </SectionBlock>
+
+      <SectionBlock eyebrow="Training" title="Core Fine-Tuning and Checkpoint Loop">
+        <p className="plain-copy reveal">
+          Source: <code>scripts/train_vit.py</code>. Each epoch performs
+          train/validation passes, applies warmup+cosine scheduling, and tracks
+          the best checkpoint by validation PR AUC.
         </p>
         <pre className="code-block reveal">
           <code>{snippetTrainLoop}</code>
         </pre>
       </SectionBlock>
 
-      <SectionBlock eyebrow="Evaluation" title="Unified Metrics and Predictions">
+      <SectionBlock eyebrow="Ensemble" title="How Ensemble Predictions Are Combined">
         <p className="plain-copy reveal">
-          The evaluator gathers predictions, deduplicates padded distributed
-          samples, and returns both metrics and prediction rows.
+          Source: <code>scripts/train_ensemble_member_cnn.py</code>. HAM10000
+          aggregate predictions are formed by mean malignancy probability across
+          fold members.
         </p>
         <pre className="code-block reveal">
-          <code>{snippetEval}</code>
-        </pre>
-      </SectionBlock>
-
-      <SectionBlock eyebrow="Shift Signal" title="Generalization Gap Computation">
-        <p className="plain-copy reveal">
-          Validation-minus-external deltas are computed for all core metrics and
-          saved as dedicated JSON artifacts.
-        </p>
-        <pre className="code-block reveal">
-          <code>{snippetGap}</code>
+          <code>{snippetEnsembleAggregation}</code>
         </pre>
       </SectionBlock>
     </>
