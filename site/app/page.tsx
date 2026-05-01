@@ -2,16 +2,24 @@ import Link from "next/link";
 import SectionBlock from "@/components/section-block";
 import { MODEL_RESULTS, toPercent } from "@/data/results";
 
+const bestValidationRocModel = MODEL_RESULTS.reduce((best, candidate) =>
+  candidate.validation.rocAuc > best.validation.rocAuc ? candidate : best
+);
+
+const bestExternalRocModel = MODEL_RESULTS.reduce((best, candidate) =>
+  candidate.externalTest.rocAuc > best.externalTest.rocAuc ? candidate : best
+);
+
 const quickStats = [
   {
     label: "Best ISIC ROC AUC",
-    value: MODEL_RESULTS[2].validation.rocAuc.toFixed(4),
-    detail: "ViT-B16 on internal validation"
+    value: bestValidationRocModel.validation.rocAuc.toFixed(4),
+    detail: `${bestValidationRocModel.label} on internal validation`
   },
   {
     label: "Best HAM10000 ROC AUC",
-    value: MODEL_RESULTS[2].externalTest.rocAuc.toFixed(4),
-    detail: "ViT-B16 on external test"
+    value: bestExternalRocModel.externalTest.rocAuc.toFixed(4),
+    detail: `${bestExternalRocModel.label} on external test`
   },
   {
     label: "Largest Recall Drop",
@@ -64,8 +72,8 @@ export default function HomePage() {
           <article className="info-card reveal">
             <h3>Pipelines</h3>
             <p>
-              Three pipelines are benchmarked: baseline CNN, 5-fold ensemble
-              CNN, and pretrained ViT-B16.
+              Four pipelines are benchmarked: baseline CNN, 5-fold ensemble
+              CNN, pretrained ViT-B16, and pretrained ViT-L16.
             </p>
           </article>
           <article className="info-card reveal">
@@ -90,8 +98,9 @@ export default function HomePage() {
         </div>
         <p className="plain-copy">
           Pinned runs: Baseline <code>20260428_042520</code>, Ensemble{" "}
-          <code>ensemble_ens_20260429_b</code>, ViT{" "}
-          <code>20260423_105922</code>.
+          <code>ensemble_ens_20260429_b</code>, ViT-B16{" "}
+          <code>20260423_105922</code>, ViT-L16{" "}
+          <code>large_vit_b16_isic_to_ham</code>.
         </p>
       </SectionBlock>
     </>

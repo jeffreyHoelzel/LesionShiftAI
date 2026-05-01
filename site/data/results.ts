@@ -27,7 +27,7 @@ export interface FigureRef {
 };
 
 export interface ModelResult {
-  id: "baseline" | "ensemble" | "vit";
+  id: "baseline" | "ensemble" | "vit" | "vitLarge";
   label: string;
   runId: string;
   notes: string;
@@ -40,7 +40,8 @@ export interface ModelResult {
 export const PINNED_RUNS = {
   baseline: "20260428_042520",
   ensemble: "ensemble_ens_20260429_b",
-  vit: "20260423_105922"
+  vit: "20260423_105922",
+  vitLarge: "20260430_165245"
 } as const;
 
 export const MODEL_RESULTS: ModelResult[] = [
@@ -221,6 +222,66 @@ export const MODEL_RESULTS: ModelResult[] = [
         title: "HAM10000 PR",
         path: "/results/vit/ham_test_pr.png",
         caption: "External-test precision-recall curve for ViT-B16."
+      }
+    ]
+  },
+  {
+    id: "vitLarge",
+    label: "Vision Transformer (ViT-L16)",
+    runId: PINNED_RUNS.vitLarge,
+    notes: "Pretrained larger ViT with warmup and cosine-style learning-rate decay.",
+    validation: {
+      accuracy: 0.9386224590487467,
+      precision: 0.8445475638051044,
+      recall: 0.8044198895027624,
+      f1: 0.8239954725523486,
+      rocAuc: 0.9657982907707461,
+      prAuc: 0.9013507949654285,
+      tn: 4028,
+      fp: 134,
+      fn: 177,
+      tp: 728
+    },
+    externalTest: {
+      accuracy: 0.8984523215177234,
+      precision: 0.9500480307396734,
+      recall: 0.5061412487205732,
+      f1: 0.6604340567612688,
+      rocAuc: 0.835486789128494,
+      prAuc: 0.7158678083129212,
+      tn: 8009,
+      fp: 52,
+      fn: 965,
+      tp: 989
+    },
+    gapValMinusTest: {
+      accuracy: 0.04017013753102339,
+      precision: -0.10550046693456894,
+      recall: 0.29827864078218924,
+      f1: 0.16356141579107986,
+      rocAuc: 0.13031150164225214,
+      prAuc: 0.1854829866525073
+    },
+    figures: [
+      {
+        title: "ISIC Validation ROC",
+        path: "/results/vit_large/val_final_roc.png",
+        caption: "Validation ROC curve for ViT-L16 on ISIC."
+      },
+      {
+        title: "ISIC Validation PR",
+        path: "/results/vit_large/val_final_pr.png",
+        caption: "Validation precision-recall curve for ViT-L16."
+      },
+      {
+        title: "HAM10000 ROC",
+        path: "/results/vit_large/ham_test_roc.png",
+        caption: "External-test ROC curve for ViT-L16 on HAM10000."
+      },
+      {
+        title: "HAM10000 PR",
+        path: "/results/vit_large/ham_test_pr.png",
+        caption: "External-test precision-recall curve for ViT-L16."
       }
     ]
   }
