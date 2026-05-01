@@ -1,0 +1,445 @@
+:root {
+  --bg-0: #040914;
+  --bg-1: #08142d;
+  --bg-2: #0d2448;
+  --surface: rgba(10, 24, 51, 0.78);
+  --surface-strong: rgba(13, 31, 64, 0.92);
+  --ink: #e9f1ff;
+  --muted: #99acd3;
+  --line: rgba(98, 131, 190, 0.33);
+  --accent: #4ea7ff;
+  --accent-strong: #2391ff;
+  --accent-soft: rgba(78, 167, 255, 0.14);
+  --shadow: 0 18px 42px rgba(1, 4, 12, 0.58);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Avenir Next", "Segoe UI", "Gill Sans", "Trebuchet MS", sans-serif;
+  color: var(--ink);
+  background: var(--bg-0);
+  line-height: 1.6;
+}
+
+.page-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 14% 14%, rgba(20, 76, 182, 0.42), transparent 42%),
+    radial-gradient(circle at 82% 12%, rgba(20, 112, 212, 0.38), transparent 45%),
+    radial-gradient(circle at 64% 78%, rgba(6, 66, 166, 0.25), transparent 46%),
+    linear-gradient(175deg, var(--bg-0) 0%, var(--bg-1) 53%, var(--bg-2) 100%);
+  z-index: -2;
+}
+
+.page-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(95, 126, 181, 0.06) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(95, 126, 181, 0.05) 1px, transparent 1px);
+  background-size: 38px 38px;
+  opacity: 0.42;
+}
+
+.site-shell {
+  width: min(1120px, 92vw);
+  margin: 0 auto;
+}
+
+.site-header {
+  border-bottom: 1px solid rgba(111, 146, 207, 0.25);
+  backdrop-filter: blur(10px);
+  background: rgba(5, 12, 27, 0.7);
+  position: sticky;
+  top: 0;
+  z-index: 15;
+}
+
+.brand-row {
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-top: 0.85rem;
+}
+
+.brand-link {
+  font-family: "Avenir Next", "Segoe UI", "Gill Sans", "Trebuchet MS", sans-serif;
+  font-size: 1.62rem;
+  text-decoration: none;
+  color: #f0f5ff;
+  letter-spacing: 0.045em;
+}
+
+.brand-tag {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.93rem;
+}
+
+.nav-list {
+  margin: 0.78rem 0 1rem;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.58rem;
+}
+
+.nav-link {
+  display: inline-block;
+  text-decoration: none;
+  color: #dbe8ff;
+  border: 1px solid var(--line);
+  padding: 0.35rem 0.82rem;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  transition: all 0.23s ease;
+  background: rgba(14, 31, 63, 0.74);
+}
+
+.nav-link:hover {
+  border-color: rgba(78, 167, 255, 0.66);
+  color: #ffffff;
+  box-shadow: 0 0 0 1px rgba(78, 167, 255, 0.2), 0 10px 22px rgba(4, 13, 29, 0.52);
+  transform: translateY(-1px);
+}
+
+.site-main {
+  padding: 2.15rem 0 3.3rem;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: "Avenir Next", "Segoe UI", "Gill Sans", "Trebuchet MS", sans-serif;
+  line-height: 1.2;
+  margin: 0;
+}
+
+h1 {
+  font-size: clamp(2rem, 4.3vw, 3.25rem);
+  margin: 0.34rem 0 0.95rem;
+  color: #f4f8ff;
+}
+
+h2 {
+  font-size: clamp(1.35rem, 2.65vw, 2.05rem);
+}
+
+h3 {
+  font-size: 1.16rem;
+}
+
+p {
+  margin: 0;
+}
+
+.hero,
+.subhero {
+  position: relative;
+  padding: 1.55rem;
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(circle at 83% 21%, rgba(26, 117, 238, 0.27), transparent 42%),
+    linear-gradient(148deg, rgba(11, 27, 57, 0.95), rgba(8, 20, 43, 0.9));
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.hero::after,
+.subhero::after {
+  content: "";
+  position: absolute;
+  inset: auto -14% -32% 58%;
+  width: 56%;
+  height: 70%;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(26, 127, 246, 0.26), transparent 72%);
+}
+
+.hero-copy {
+  max-width: 74ch;
+  color: #bed0ee;
+}
+
+.hero-eyebrow {
+  margin-bottom: 0.22rem;
+  text-transform: uppercase;
+  letter-spacing: 0.13em;
+  color: #74bbff;
+  font-size: 0.8rem;
+}
+
+.hero-links {
+  margin-top: 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.76rem;
+}
+
+.button {
+  text-decoration: none;
+  padding: 0.58rem 1rem;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.92rem;
+  border: 1px solid transparent;
+  transition: all 0.23s ease;
+}
+
+.button-primary {
+  background: linear-gradient(135deg, #3f9fff, #1d80e0);
+  color: #f9fcff;
+  box-shadow: 0 10px 20px rgba(8, 76, 152, 0.44);
+}
+
+.button-primary:hover {
+  background: linear-gradient(135deg, #53aaff, #2a8be8);
+  transform: translateY(-1px);
+}
+
+.button-outline {
+  border-color: rgba(111, 167, 235, 0.64);
+  color: #cae3ff;
+  background: rgba(16, 43, 85, 0.44);
+}
+
+.button-outline:hover {
+  background: rgba(21, 57, 110, 0.62);
+}
+
+.section-block {
+  margin-top: 1.75rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 1.34rem;
+  backdrop-filter: blur(3px);
+}
+
+.section-eyebrow {
+  font-size: 0.79rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: #77bdff;
+  margin-bottom: 0.35rem;
+}
+
+.section-title {
+  margin-bottom: 0.95rem;
+  color: #f2f7ff;
+}
+
+.section-body {
+  display: grid;
+  gap: 1rem;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 0.92rem;
+}
+
+.info-card,
+.stat-card {
+  background: rgba(11, 31, 67, 0.88);
+  border: 1px solid rgba(104, 146, 209, 0.33);
+  border-radius: 12px;
+  padding: 0.92rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.info-card p,
+.stat-card p {
+  color: #bdd0ef;
+}
+
+.stat-label {
+  font-size: 0.79rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #89aee6;
+}
+
+.stat-value {
+  font-size: 1.56rem;
+  color: #f5fbff;
+  font-family: "Avenir Next", "Segoe UI", "Gill Sans", "Trebuchet MS", sans-serif;
+}
+
+.stat-detail {
+  color: #a7bde4;
+  font-size: 0.9rem;
+}
+
+.plain-copy {
+  color: #b5c8e9;
+}
+
+.plain-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.4rem;
+  color: #c2d6f3;
+}
+
+.table-wrap {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.table-wrap h3 {
+  color: #e9f2ff;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.metrics-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 860px;
+  background: rgba(9, 22, 47, 0.72);
+}
+
+.metrics-table th,
+.metrics-table td {
+  border: 1px solid rgba(96, 130, 181, 0.39);
+  padding: 0.54rem;
+  text-align: left;
+  vertical-align: top;
+  font-size: 0.89rem;
+  color: #d7e4f9;
+}
+
+.metrics-table thead th {
+  background: rgba(27, 57, 107, 0.64);
+  color: #f0f6ff;
+}
+
+.figure-section {
+  display: grid;
+  gap: 0.72rem;
+}
+
+.figure-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 0.82rem;
+}
+
+.figure-card {
+  border: 1px solid rgba(102, 141, 203, 0.34);
+  border-radius: 12px;
+  padding: 0.76rem;
+  background: rgba(11, 30, 65, 0.88);
+  display: grid;
+  gap: 0.46rem;
+}
+
+.figure-card h4 {
+  color: #eef4ff;
+}
+
+.figure-card img {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid rgba(88, 125, 186, 0.46);
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.32);
+}
+
+.figure-card p {
+  color: #abc1e4;
+  font-size: 0.89rem;
+}
+
+.code-block {
+  margin: 0;
+  border: 1px solid rgba(104, 144, 205, 0.4);
+  border-radius: 10px;
+  padding: 0.82rem;
+  background: rgba(6, 18, 39, 0.94);
+  overflow-x: auto;
+}
+
+.code-block code {
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 0.86rem;
+  color: #d9e9ff;
+}
+
+code {
+  font-family: "Consolas", "Courier New", monospace;
+  background: var(--accent-soft);
+  color: #d6e9ff;
+  padding: 0.08rem 0.28rem;
+  border-radius: 4px;
+}
+
+.site-footer {
+  padding: 1.15rem 0 2.2rem;
+  border-top: 1px solid rgba(99, 134, 193, 0.28);
+  color: #99afd6;
+  font-size: 0.9rem;
+}
+
+.reveal {
+  animation: reveal-up 560ms ease both;
+}
+
+.card-grid > *:nth-child(2) {
+  animation-delay: 70ms;
+}
+
+.card-grid > *:nth-child(3) {
+  animation-delay: 140ms;
+}
+
+.card-grid > *:nth-child(4) {
+  animation-delay: 210ms;
+}
+
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(9px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 760px) {
+  .brand-row {
+    display: grid;
+    gap: 0.42rem;
+  }
+
+  .hero,
+  .subhero,
+  .section-block {
+    padding: 1.02rem;
+  }
+}

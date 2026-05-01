@@ -1,13 +1,17 @@
+"""train_baseline_cnn.py
+
+Runs the ISIC 2019 baseline CNN training, validation, 
+and HAM10000 external testing logic. Makes use of DDP for
+multi-GPU training and testing.
+"""
 import argparse
 import os
 from pathlib import Path
-
 import torch
 import torch.distributed as dist
 from torch import nn
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import AdamW
-
 from lesionshiftai.core.config import load_config
 from lesionshiftai.core.distributed import barrier, cleanup_dist, setup_dist
 from lesionshiftai.core.reproducibility import set_seed
@@ -20,10 +24,12 @@ from lesionshiftai.train.engine import train_one_epoch
 
 
 def _unwrap_model(model: torch.nn.Module) -> torch.nn.Module:
+    """Returns the underlying model when wrapped in DistributedDataParallel."""
     return model.module if isinstance(model, DDP) else model
 
 
 def _pos_weight(train_df) -> torch.Tensor:
+    """Computes the positive class weight from the training labels."""
     counts = train_df["label"].value_counts().to_dict()
     neg = float(counts.get(0, 0))
     pos = float(counts.get(1, 1))
@@ -31,6 +37,10 @@ def _pos_weight(train_df) -> torch.Tensor:
 
 
 def main() -> None:
+    """
+    Runs baseline CNN training, validation, testing, checkpointing, 
+    and metric artifact generation.
+    """
     p = argparse.ArgumentParser()
     p.add_argument("--config", default="config/baseline_cnn.yml", type=str)
     p.add_argument("--threshold", default=0.5, type=float)
@@ -164,7 +174,7 @@ def main() -> None:
                 output_dir=curves_dir,
                 split_name="ham_test",
                 model_scope="baseline",
-                extra_metadata={"threshold": float(args.threshold)},
+                extra_metadata={"threshold": float(args.threshold)}
             )
 
             write_json(run_dir / "metrics" /

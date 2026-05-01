@@ -1,18 +1,20 @@
+"""curves.py
+
+Generates and writes all curves to disk.
+"""
 import json
 from pathlib import Path
 from typing import Any, Dict, List
-
+import matplotlib.pyplot as plt
 import matplotlib
 import numpy as np
 from sklearn.metrics import (
     average_precision_score,
     precision_recall_curve,
     roc_auc_score,
-    roc_curve,
+    roc_curve
 )
-
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 
 
 def write_binary_curve_artifacts(
@@ -23,7 +25,36 @@ def write_binary_curve_artifacts(
     model_scope: str,
     extra_metadata: Dict[str, Any] | None = None
 ) -> Dict[str, Any]:
-    """Write ROC/PR curve artifacts and return serialized curve payload."""
+    """
+    Writes ROC and precision-recall curve artifacts for binary classification.
+
+    Parameters
+    ------------
+        y_true : np.ndarray
+            Ground truth binary labels.
+        y_prob : np.ndarray
+            Predicted positive class probabilities.
+        output_dir : str | Path
+            Directory where curve plots and JSON payloads are written.
+        split_name : str
+            Name of the data split being evaluated.
+        model_scope : str
+            Label describing the model or evaluation scope.
+        extra_metadata : Dict[str, Any] | None
+            Optional metadata added to the serialized curve payload.
+
+    Returns
+    --------
+        payload : Dict[str, Any]
+            Serialized curve payload containing metrics, curve values, and metadata.
+
+    Raises
+    -------
+        OSError
+            Raised when the output directory or artifact files cannot be created or written.
+        ValueError
+            Raised when curve metrics cannot be computed from the provided labels or probabilities.
+    """
     y_true_np = np.asarray(y_true, dtype=int)
     y_prob_np = np.asarray(y_prob, dtype=float)
     output_path = Path(output_dir)
@@ -103,9 +134,36 @@ def write_fold_curve_overlay_artifacts(
     output_dir: str | Path,
     split_name: str,
     model_scope: str,
-    extra_metadata: Dict[str, Any] | None = None,
+    extra_metadata: Dict[str, Any] | None = None
 ) -> Dict[str, Any]:
-    """Write fold-level ROC/PR overlay plots from per-fold curve payloads."""
+    """
+    Writes fold-level ROC and precision-recall overlay artifacts.
+
+    Parameters
+    ------------
+        fold_curve_payloads : List[Dict[str, Any]]
+            List of per-fold curve payloads generated from binary curve artifacts.
+        output_dir : str | Path
+            Directory where overlay plots and JSON payloads are written.
+        split_name : str
+            Name of the data split being evaluated.
+        model_scope : str
+            Label describing the model or evaluation scope.
+        extra_metadata : Dict[str, Any] | None
+            Optional metadata added to the serialized overlay payload.
+
+    Returns
+    --------
+        payload : Dict[str, Any]
+            Serialized overlay payload containing plotted fold summaries and skipped fold details.
+
+    Raises
+    -------
+        OSError
+            Raised when the output directory or artifact files cannot be created or written.
+        TypeError
+            Raised when fold payload values cannot be converted to expected numeric types.
+    """
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
@@ -113,7 +171,7 @@ def write_fold_curve_overlay_artifacts(
         "status": "ok",
         "split": split_name,
         "model_scope": model_scope,
-        "n_folds_requested": int(len(fold_curve_payloads)),
+        "n_folds_requested": int(len(fold_curve_payloads))
     }
     if extra_metadata:
         payload.update(extra_metadata)
@@ -165,7 +223,7 @@ def write_fold_curve_overlay_artifacts(
                 "fpr": fpr,
                 "tpr": tpr,
                 "recall": recall,
-                "precision": precision,
+                "precision": precision
             }
         )
 
@@ -178,7 +236,7 @@ def write_fold_curve_overlay_artifacts(
             "roc_auc": float(row["roc_auc"]),
             "pr_auc": float(row["pr_auc"]),
             "n_samples": int(row["n_samples"]),
-            "n_positive": int(row["n_positive"]),
+            "n_positive": int(row["n_positive"])
         }
         for row in fold_curves
     ]
@@ -225,9 +283,34 @@ def write_fold_auc_history_overlay_artifacts(
     output_dir: str | Path,
     split_name: str,
     model_scope: str,
-    extra_metadata: Dict[str, Any] | None = None,
+    extra_metadata: Dict[str, Any] | None = None
 ) -> Dict[str, Any]:
-    """Write fold-level ROC AUC / PR AUC-over-epoch overlay plots."""
+    """
+    Writes fold-level ROC AUC and PR AUC history overlay artifacts.
+
+    Parameters
+    ------------
+        fold_history_payloads : List[Dict[str, Any]]
+            List of per-fold training history payloads containing epoch validation metrics.
+        output_dir : str | Path
+            Directory where AUC history plots and JSON payloads are written.
+        split_name : str
+            Name of the data split or fold group being summarized.
+        model_scope : str
+            Label describing the model or evaluation scope.
+        extra_metadata : Dict[str, Any] | None
+            Optional metadata added to the serialized history payload.
+
+    Returns
+    --------
+        payload : Dict[str, Any]
+            Serialized history overlay payload containing plotted fold summaries and skipped fold details.
+
+    Raises
+    -------
+        OSError
+            Raised when the output directory or artifact files cannot be created or written.
+    """
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
@@ -235,7 +318,7 @@ def write_fold_auc_history_overlay_artifacts(
         "status": "ok",
         "split": split_name,
         "model_scope": model_scope,
-        "n_folds_requested": int(len(fold_history_payloads)),
+        "n_folds_requested": int(len(fold_history_payloads))
     }
     if extra_metadata:
         payload.update(extra_metadata)
@@ -278,14 +361,16 @@ def write_fold_auc_history_overlay_artifacts(
             continue
 
         ordered_epochs = sorted(per_epoch.keys())
-        roc_auc_values = [float(per_epoch[epoch][0]) for epoch in ordered_epochs]
-        pr_auc_values = [float(per_epoch[epoch][1]) for epoch in ordered_epochs]
+        roc_auc_values = [float(per_epoch[epoch][0])
+                          for epoch in ordered_epochs]
+        pr_auc_values = [float(per_epoch[epoch][1])
+                         for epoch in ordered_epochs]
         fold_histories.append(
             {
                 "fold_index": int(fold_index),
                 "epochs": ordered_epochs,
                 "roc_auc": roc_auc_values,
-                "pr_auc": pr_auc_values,
+                "pr_auc": pr_auc_values
             }
         )
 
@@ -299,7 +384,7 @@ def write_fold_auc_history_overlay_artifacts(
             "first_epoch": int(row["epochs"][0]),
             "last_epoch": int(row["epochs"][-1]),
             "roc_auc_last": float(row["roc_auc"][-1]),
-            "pr_auc_last": float(row["pr_auc"][-1]),
+            "pr_auc_last": float(row["pr_auc"][-1])
         }
         for row in fold_histories
     ]
@@ -316,14 +401,14 @@ def write_fold_auc_history_overlay_artifacts(
         split_name=split_name,
         metric_name="ROC AUC",
         fold_histories=fold_histories,
-        metric_key="roc_auc",
+        metric_key="roc_auc"
     )
     _plot_fold_auc_history(
         output_path=output_path / f"{split_name}_pr_auc_history.png",
         split_name=split_name,
         metric_name="PR AUC",
         fold_histories=fold_histories,
-        metric_key="pr_auc",
+        metric_key="pr_auc"
     )
 
     overlay_json_path.write_text(_to_json(payload), encoding="utf-8")
@@ -331,6 +416,7 @@ def write_fold_auc_history_overlay_artifacts(
 
 
 def _to_float_array(values: Any) -> np.ndarray:
+    """Converts finite numeric values into a NumPy float array."""
     if values is None:
         return np.asarray([], dtype=float)
     cleaned = [
@@ -342,6 +428,7 @@ def _to_float_array(values: Any) -> np.ndarray:
 
 
 def _to_json_numbers(values: np.ndarray) -> List[float | None]:
+    """Converts a NumPy array into JSON-compatible numeric values."""
     out: list[float | None] = []
     for value in values:
         val = float(value)
@@ -350,6 +437,7 @@ def _to_json_numbers(values: np.ndarray) -> List[float | None]:
 
 
 def _to_json(payload: Dict[str, Any]) -> str:
+    """Serializes a dictionary payload as formatted JSON."""
     return json.dumps(payload, indent=2)
 
 
@@ -358,8 +446,9 @@ def _plot_roc_curve(
     split_name: str,
     fpr: np.ndarray,
     tpr: np.ndarray,
-    roc_auc: float,
+    roc_auc: float
 ) -> None:
+    """Plots and saves a ROC curve image."""
     fig, ax = plt.subplots(figsize=(6, 5))
     ax.plot(fpr, tpr, linewidth=2, label=f"ROC AUC = {roc_auc:.4f}")
     ax.plot([0.0, 1.0], [0.0, 1.0], linestyle="--", linewidth=1, color="gray")
@@ -382,8 +471,9 @@ def _plot_pr_curve(
     recall: np.ndarray,
     pr_auc: float,
     n_positive: int,
-    n_samples: int,
+    n_samples: int
 ) -> None:
+    """Plots and saves a precision-recall curve image."""
     baseline = n_positive / max(n_samples, 1)
 
     fig, ax = plt.subplots(figsize=(6, 5))
@@ -393,7 +483,7 @@ def _plot_pr_curve(
         linestyle="--",
         linewidth=1,
         color="gray",
-        label=f"Prevalence = {baseline:.4f}",
+        label=f"Prevalence = {baseline:.4f}"
     )
     ax.set_xlabel("Recall")
     ax.set_ylabel("Precision")
@@ -410,8 +500,9 @@ def _plot_pr_curve(
 def _plot_fold_roc_curves(
     output_path: Path,
     split_name: str,
-    fold_curves: List[dict[str, Any]],
+    fold_curves: List[dict[str, Any]]
 ) -> None:
+    """Plots and saves fold-level ROC curve overlays."""
     fig, ax = plt.subplots(figsize=(8, 6))
     for row in fold_curves:
         fold_number = int(row["fold_index"]) + 1
@@ -420,7 +511,7 @@ def _plot_fold_roc_curves(
             row["fpr"],
             row["tpr"],
             linewidth=2,
-            label=f"Fold {fold_number} | AUC: {auc:.3f}",
+            label=f"Fold {fold_number} | AUC: {auc:.3f}"
         )
 
     ax.plot(
@@ -429,7 +520,7 @@ def _plot_fold_roc_curves(
         linestyle="--",
         linewidth=1.5,
         color="#C17BB3",
-        label="Chance",
+        label="Chance"
     )
     ax.set_xlabel("False Positive Rate")
     ax.set_ylabel("True Positive Rate")
@@ -447,8 +538,9 @@ def _plot_fold_pr_curves(
     output_path: Path,
     split_name: str,
     fold_curves: List[dict[str, Any]],
-    prevalence: float | None,
+    prevalence: float | None
 ) -> None:
+    """Plots and saves fold-level precision-recall curve overlays."""
     fig, ax = plt.subplots(figsize=(8, 6))
     for row in fold_curves:
         fold_number = int(row["fold_index"]) + 1
@@ -457,7 +549,7 @@ def _plot_fold_pr_curves(
             row["recall"],
             row["precision"],
             linewidth=2,
-            label=f"Fold {fold_number} | AUC: {auc:.3f}",
+            label=f"Fold {fold_number} | AUC: {auc:.3f}"
         )
 
     if prevalence is not None:
@@ -466,7 +558,7 @@ def _plot_fold_pr_curves(
             linestyle="--",
             linewidth=1.5,
             color="#6C757D",
-            label=f"Prevalence = {prevalence:.3f}",
+            label=f"Prevalence = {prevalence:.3f}"
         )
 
     ax.set_xlabel("Recall")
@@ -486,8 +578,9 @@ def _plot_fold_auc_history(
     split_name: str,
     metric_name: str,
     fold_histories: List[dict[str, Any]],
-    metric_key: str,
+    metric_key: str
 ) -> None:
+    """Plots and saves fold-level AUC history curves."""
     fig, ax = plt.subplots(figsize=(8, 6))
     for row in fold_histories:
         fold_number = int(row["fold_index"]) + 1
@@ -500,7 +593,7 @@ def _plot_fold_auc_history(
             linewidth=2,
             marker="o",
             markersize=3,
-            label=f"Fold {fold_number} | Final: {final_value:.3f}",
+            label=f"Fold {fold_number} | Final: {final_value:.3f}"
         )
 
     ax.set_xlabel("Epoch")

@@ -1,8 +1,13 @@
+"""train_ensemble_member_cnn.py
+
+Trains, validates, and tests each of the ensemble members 
+(two or more CNNs) as multiple baseline CNNs on subsets of the data.
+"""
 import argparse
 import json
 import shutil
 from pathlib import Path
-
+from typing import Dict
 import pandas as pd
 import torch
 from torch import nn
@@ -10,7 +15,6 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
-
 from lesionshiftai.core.config import load_config
 from lesionshiftai.core.distributed import barrier, cleanup_dist, setup_dist
 from lesionshiftai.core.reproducibility import init_generator, seed_worker, set_seed
@@ -23,7 +27,7 @@ from lesionshiftai.data.transforms import build_eval_transform
 from lesionshiftai.eval.curves import (
     write_binary_curve_artifacts,
     write_fold_auc_history_overlay_artifacts,
-    write_fold_curve_overlay_artifacts,
+    write_fold_curve_overlay_artifacts
 )
 from lesionshiftai.eval.evaluator import evaluate_loader, generalization_gap
 from lesionshiftai.eval.metrics import compute_binary_metrics
@@ -32,10 +36,12 @@ from lesionshiftai.train.engine import train_one_epoch
 
 
 def _unwrap_model(model: torch.nn.Module) -> torch.nn.Module:
+    """Returns the underlying model when wrapped in DistributedDataParallel."""
     return model.module if isinstance(model, DDP) else model
 
 
 def _pos_weight(train_df) -> torch.Tensor:
+    """Computes the positive class weight from the training labels."""
     counts = train_df["label"].value_counts().to_dict()
     neg = float(counts.get(0, 0))
     pos = float(counts.get(1, 1))
@@ -47,10 +53,12 @@ def _ensemble_root(
     experiment_name: str,
     ensemble_run_id: str
 ) -> Path:
+    """Builds the root output directory for an ensemble run."""
     return output_root / experiment_name / f"ensemble_{ensemble_run_id}"
 
 
 def _member_dir_from_root(ensemble_root: Path, fold_index: int) -> Path:
+    """Builds the output directory for a specific ensemble fold member."""
     return (
         ensemble_root
         / "members"
@@ -59,6 +67,7 @@ def _member_dir_from_root(ensemble_root: Path, fold_index: int) -> Path:
 
 
 def _prepare_member_dirs(member_dir: Path, config_path: str | Path) -> None:
+    """Creates member output directories and copies the run configuration."""
     (member_dir / "checkpoints").mkdir(parents=True, exist_ok=True)
     (member_dir / "metrics").mkdir(parents=True, exist_ok=True)
     (member_dir / "predictions").mkdir(parents=True, exist_ok=True)
@@ -68,8 +77,9 @@ def _prepare_member_dirs(member_dir: Path, config_path: str | Path) -> None:
 def _build_ham_test_loader(
     cfg,
     world_size: int,
-    rank: int,
+    rank: int
 ) -> DataLoader:
+    """Builds the HAM test DataLoader for ensemble evaluation."""
     ham_df = load_ham_metadata(cfg.data.ham_root)
     eval_tf = build_eval_transform(cfg.data.image_size)
     test_ds = LesionDataset(ham_df, eval_tf)
@@ -81,7 +91,7 @@ def _build_ham_test_loader(
             num_replicas=world_size,
             rank=rank,
             shuffle=False,
-            seed=cfg.seed,
+            seed=cfg.seed
         )
 
     return DataLoader(
@@ -93,7 +103,7 @@ def _build_ham_test_loader(
         persistent_workers=cfg.data.num_workers > 0,
         shuffle=False,
         sampler=test_sampler,
-        generator=init_generator(cfg.seed + 9000 + rank),
+        generator=init_generator(cfg.seed + 9000 + rank)
     )
 
 
@@ -102,7 +112,8 @@ def _write_ensemble_validation_if_ready(
     ensemble_run_id: str,
     num_folds: int,
     threshold: float
-) -> dict[str, object]:
+) -> Dict[str, object]:
+    """Aggregates ensemble validation and HAM test artifacts once all folds are complete."""
     missing_folds = []
     for fold_index in range(num_folds):
         complete_path = (
@@ -128,7 +139,8 @@ def _write_ensemble_validation_if_ready(
     member_test_summary_rows = []
     member_test_curve_payloads = []
     member_test_history_payloads = []
-    required_cols = {"sample_id", "dataset", "label", "prob_malignant", "pred_label"}
+    required_cols = {"sample_id", "dataset",
+                     "label", "prob_malignant", "pred_label"}
 
     for fold_index in range(num_folds):
         member_dir = _member_dir_from_root(ensemble_root, fold_index)
@@ -183,7 +195,8 @@ def _write_ensemble_validation_if_ready(
             raise ValueError(
                 f"Missing columns in {test_preds_path}: {sorted(missing_test_cols)}"
             )
-        test_duplicates = test_preds.duplicated(subset=["dataset", "sample_id"])
+        test_duplicates = test_preds.duplicated(
+            subset=["dataset", "sample_id"])
         if test_duplicates.any():
             duplicate_count = int(test_duplicates.sum())
             raise RuntimeError(
@@ -194,7 +207,8 @@ def _write_ensemble_validation_if_ready(
         test_preds["member_fold"] = fold_index
         all_test_preds.append(test_preds)
 
-        member_test_metrics = json.loads(test_metrics_path.read_text(encoding="utf-8"))
+        member_test_metrics = json.loads(
+            test_metrics_path.read_text(encoding="utf-8"))
         member_test_curve_payloads.append(
             json.loads(test_curve_path.read_text(encoding="utf-8"))
         )
@@ -219,10 +233,10 @@ def _write_ensemble_validation_if_ready(
                         "epoch": int(best_epoch),
                         "val": {
                             "roc_auc": member_test_metrics.get("roc_auc"),
-                            "pr_auc": member_test_metrics.get("pr_auc"),
-                        },
+                            "pr_auc": member_test_metrics.get("pr_auc")
+                        }
                     }
-                ],
+                ]
             }
         )
         member_test_summary = {
@@ -275,8 +289,8 @@ def _write_ensemble_validation_if_ready(
         extra_metadata={
             "threshold": float(threshold),
             "ensemble_run_id": ensemble_run_id,
-            "num_folds": int(num_folds),
-        },
+            "num_folds": int(num_folds)
+        }
     )
     write_fold_curve_overlay_artifacts(
         fold_curve_payloads=member_curve_payloads,
@@ -285,8 +299,8 @@ def _write_ensemble_validation_if_ready(
         model_scope="ensemble_member_folds",
         extra_metadata={
             "ensemble_run_id": ensemble_run_id,
-            "num_folds": int(num_folds),
-        },
+            "num_folds": int(num_folds)
+        }
     )
     write_fold_auc_history_overlay_artifacts(
         fold_history_payloads=member_history_payloads,
@@ -295,8 +309,8 @@ def _write_ensemble_validation_if_ready(
         model_scope="ensemble_member_folds",
         extra_metadata={
             "ensemble_run_id": ensemble_run_id,
-            "num_folds": int(num_folds),
-        },
+            "num_folds": int(num_folds)
+        }
     )
     write_json(metrics_dir / "isic_val_aggregate_metrics.json",
                aggregate_metrics)
@@ -354,7 +368,7 @@ def _write_ensemble_validation_if_ready(
             label=("label", "first"),
             prob_malignant=("prob_malignant", "mean"),
             prob_malignant_std=("prob_malignant", "std"),
-            member_predictions=("member_fold", "nunique"),
+            member_predictions=("member_fold", "nunique")
         )
     )
     test_aggregate_df["prob_malignant_std"] = (
@@ -369,7 +383,7 @@ def _write_ensemble_validation_if_ready(
     test_aggregate_metrics = compute_binary_metrics(
         y_true=test_y_true,
         y_prob=test_y_prob,
-        threshold=threshold,
+        threshold=threshold
     )
     test_aggregate_metrics["num_folds"] = int(num_folds)
     test_aggregate_metrics["threshold"] = float(threshold)
@@ -379,7 +393,7 @@ def _write_ensemble_validation_if_ready(
 
     test_aggregate_df.to_csv(
         predictions_dir / "ham_test_aggregate_predictions.csv",
-        index=False,
+        index=False
     )
     pd.DataFrame(member_test_summary_rows).sort_values(
         by="member_fold"
@@ -393,8 +407,8 @@ def _write_ensemble_validation_if_ready(
         extra_metadata={
             "threshold": float(threshold),
             "ensemble_run_id": ensemble_run_id,
-            "num_folds": int(num_folds),
-        },
+            "num_folds": int(num_folds)
+        }
     )
     write_fold_curve_overlay_artifacts(
         fold_curve_payloads=member_test_curve_payloads,
@@ -403,8 +417,8 @@ def _write_ensemble_validation_if_ready(
         model_scope="ensemble_member_folds",
         extra_metadata={
             "ensemble_run_id": ensemble_run_id,
-            "num_folds": int(num_folds),
-        },
+            "num_folds": int(num_folds)
+        }
     )
     write_fold_auc_history_overlay_artifacts(
         fold_history_payloads=member_test_history_payloads,
@@ -413,13 +427,14 @@ def _write_ensemble_validation_if_ready(
         model_scope="ensemble_member_folds",
         extra_metadata={
             "ensemble_run_id": ensemble_run_id,
-            "num_folds": int(num_folds),
-        },
+            "num_folds": int(num_folds)
+        }
     )
-    write_json(metrics_dir / "ham_test_aggregate_metrics.json", test_aggregate_metrics)
+    write_json(metrics_dir / "ham_test_aggregate_metrics.json",
+               test_aggregate_metrics)
     write_json(
         metrics_dir / "generalization_gap.json",
-        generalization_gap(aggregate_metrics, test_aggregate_metrics),
+        generalization_gap(aggregate_metrics, test_aggregate_metrics)
     )
 
     return {
@@ -430,6 +445,7 @@ def _write_ensemble_validation_if_ready(
 
 
 def main() -> None:
+    """Runs k-fold baseline CNN ensemble training, testing, and aggregation."""
     p = argparse.ArgumentParser()
     p.add_argument("--config", default="config/baseline_cnn.yml", type=str)
     p.add_argument("--num-folds", default=5, type=int)
@@ -467,7 +483,7 @@ def main() -> None:
         ham_test_loader = _build_ham_test_loader(
             cfg=cfg,
             world_size=dist_state.world_size,
-            rank=dist_state.rank,
+            rank=dist_state.rank
         )
 
         for fold_index in fold_indices:
@@ -567,7 +583,7 @@ def main() -> None:
 
             best_ckpt = torch.load(
                 member_dir / "checkpoints" / "best.pt",
-                map_location=device,
+                map_location=device
             )
             _unwrap_model(model).load_state_dict(best_ckpt["model_state_dict"])
             test_metrics, test_preds = evaluate_loader(
@@ -576,7 +592,7 @@ def main() -> None:
                 criterion=criterion,
                 device=device,
                 dist_state=dist_state,
-                threshold=args.threshold,
+                threshold=args.threshold
             )
 
             if dist_state.is_main:
@@ -620,7 +636,8 @@ def main() -> None:
                 )
                 write_binary_curve_artifacts(
                     y_true=best_val_preds["label"].to_numpy(dtype=int),
-                    y_prob=best_val_preds["prob_malignant"].to_numpy(dtype=float),
+                    y_prob=best_val_preds["prob_malignant"].to_numpy(
+                        dtype=float),
                     output_dir=member_dir / "metrics" / "curves",
                     split_name="val_final",
                     model_scope="ensemble_member",
@@ -628,8 +645,8 @@ def main() -> None:
                         "threshold": float(args.threshold),
                         "ensemble_run_id": args.ensemble_run_id,
                         "fold_index": int(fold_index),
-                        "num_folds": int(args.num_folds),
-                    },
+                        "num_folds": int(args.num_folds)
+                    }
                 )
                 test_preds.to_csv(
                     member_dir / "predictions" / "ham_test.csv",
@@ -645,8 +662,8 @@ def main() -> None:
                         "threshold": float(args.threshold),
                         "ensemble_run_id": args.ensemble_run_id,
                         "fold_index": int(fold_index),
-                        "num_folds": int(args.num_folds),
-                    },
+                        "num_folds": int(args.num_folds)
+                    }
                 )
                 write_json(member_dir / "metrics" /
                            "history.json", {"epochs": history})

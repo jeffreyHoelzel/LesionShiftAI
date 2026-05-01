@@ -1,3 +1,7 @@
+"""metrics.py
+
+Computes all binary metrics required for binary classifier models.
+"""
 from typing import Dict
 import numpy as np
 from sklearn.metrics import (
@@ -16,7 +20,28 @@ def compute_binary_metrics(
     y_prob: np.ndarray,
     threshold: float = 0.5
 ) -> Dict[str, float]:
-    """Compute binary classification metrics from labels and probabilities."""
+    """
+    Computes binary classification metrics from labels and predicted probabilities.
+
+    Parameters
+    ------------
+        y_true : np.ndarray
+            Ground truth binary labels.
+        y_prob : np.ndarray
+            Predicted positive class probabilities.
+        threshold : float
+            Probability cutoff used to convert predicted probabilities into binary labels.
+
+    Returns
+    --------
+        metrics : Dict[str, float]
+            Dictionary containing accuracy, precision, recall, F1, ROC AUC, PR AUC, and confusion matrix counts.
+
+    Raises
+    -------
+        ValueError
+            Raised when y_true and y_prob have incompatible shapes or invalid values for metric computation.
+    """
     y_pred = (y_prob >= threshold).astype(int)
 
     def _safe_auc(fn, yt, yp):

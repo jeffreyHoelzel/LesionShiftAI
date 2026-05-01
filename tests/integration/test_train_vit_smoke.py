@@ -40,8 +40,11 @@ def test_train_vit_smoke(
         warmup_epochs=0,
     )
 
-    import lesionshiftai.models.vit as vit_mod
-    monkeypatch.setattr(vit_mod, "ViTBinaryClassifier", lambda pretrained=True: tiny_binary_model_class())
+    monkeypatch.setattr(
+        script_mod,
+        "ViTBinaryClassifier",
+        lambda pretrained=True: tiny_binary_model_class(),
+    )
     monkeypatch.setenv("WORLD_SIZE", "1")
     monkeypatch.setattr(sys, "argv", ["train_vit.py", "--config", str(cfg_path), "--threshold", "0.5"])
 
